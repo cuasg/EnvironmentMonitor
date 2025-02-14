@@ -1,0 +1,108 @@
+.dashboard {
+  padding: 20px;
+  margin-top: 60px;
+}
+
+.dashboard-title {
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+.tiles-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.tile {
+  background-color: #f8f9fa;
+  color: #333;
+  padding: 15px;
+  border-radius: 8px;
+  width: 250px;
+  text-align: center;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ddd;
+  cursor: grab;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.ph-controls {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* ✅ NEW: Toggle Switch */
+.toggle-switch {
+  width: 40px;
+  height: 20px;
+  background: #ccc;
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s ease-in-out;
+}
+
+.toggle-thumb {
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  transition: transform 0.3s ease-in-out;
+}
+
+/* ✅ ON State */
+.toggle-switch.on {
+  background: #27ae60;
+}
+
+.toggle-switch.on .toggle-thumb {
+  transform: translateX(20px);
+}
+
+/* ✅ Hover Effect */
+.toggle-switch:hover {
+  opacity: 0.8;
+}
+
+/* ✅ Light Sensor Tile */
+.light-sensor {
+  font-size: 18px; /* Increased font size */
+  font-weight: 700; /* Bold text */
+  margin-top: 10px;
+}
+
+/* ✅ Adjust colors for readability */
+.light-intensity {
+  font-size: 18px; /* Make the text slightly larger */
+  font-weight: bold; /* Make it bolder */
+}
+
+/* ✅ Text color adjustments */
+.light-intensity.high {
+  color: green;
+}
+
+.light-intensity.med {
+  color: yellow;
+  /*text-shadow: 0 0 3px rgba(0, 0, 0, 0.5); /* Shadow for better visibility */
+}
+
+.light-intensity.low {
+  color: red;
+}

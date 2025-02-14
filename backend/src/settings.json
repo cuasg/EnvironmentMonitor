@@ -1,0 +1,44 @@
+{
+    "pH_monitoring_enabled": true,
+    "ph_calibration": {
+        "mode": "2-point",
+        "calibration_points": {
+            "2-point": {
+                "ph4_voltage": 3.1,
+                "ph7_voltage": 2.55
+            },
+            "3-point": {
+                "ph4_voltage": 3.1,
+                "ph7_voltage": 2.55,
+                "ph10_voltage": 2.1
+            }
+        }
+    },
+    "pump_settings": {
+        "low_pH": 5.8,
+        "high_pH": 6.29,
+        "pump_duration": 1,
+        "stabilization_time": 3600
+    },
+    "sensor_intervals": {
+        "ph_check_interval": 301,
+        "sensor_update_interval": 10
+    },
+    "last_ph_check": "2025-02-14 12:56 PM",
+    "next_ph_check": "2025-02-14 01:56 PM",
+    "last_pump_activation": {
+        "pump": "up",
+        "timestamp": "2025-02-14 12:56 PM"
+    },
+    "ph_voltage": 2.929625,
+    "pH_value": 4.929,
+    "tds_voltage": 1.528,
+    "ppm_500": 528.32,
+    "light_sensor": {
+        "digital": 0,
+        "analog_voltage": 0.618
+    },
+    "humidity": 22.3,
+    "air_temperature_f": 71.24,
+    "water_temperature_f": 68.11
+}

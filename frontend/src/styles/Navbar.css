@@ -1,0 +1,132 @@
+/* ✅ Navbar Container */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #282c34;
+  color: white;
+  position: fixed;
+  width: 100%;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+}
+
+/* ✅ Navigation Links */
+.nav-left {
+  display: flex;
+  gap: 15px;
+}
+
+/* ✅ Updated Nav Links for Buttons */
+.nav-link {
+  background: none;
+  border: none;
+  color: white;
+  text-decoration: none;
+  font-size: 18px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background-color 0.3s, text-decoration 0.3s;
+}
+
+/* ✅ Hover Effect for Nav Links */
+.nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  text-decoration: underline;
+}
+
+/* ✅ System Controls Dropdown */
+.nav-right {
+  position: relative;
+  display: inline-block;
+  padding-right: 45px;
+}
+
+.dropdown-button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+/* ✅ Dropdown Menu */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: -40px;  /* Adjusts position to prevent overflow */
+  background-color: #444;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  border-radius: 5px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: left;
+  padding: 5px 0;
+  transform: translateX(-30px); /* ✅ Shifts menu left to prevent running off screen */
+}
+
+/* ✅ Dropdown Item */
+.dropdown-item {
+  background: none;
+  color: white;
+  border: none;
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  font-size: 14px;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+/* ✅ Dropdown Hover Effect */
+.dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+/* ✅ Special Styling for Shutdown Button */
+.shutdown {
+  background-color: red !important;
+}
+
+.shutdown:hover {
+  background-color: darkred !important;
+}
+
+/* ✅ Prevent Dropdown from Running Off the Screen */
+@media (max-width: 600px) {
+  .dropdown-menu {
+    right: 10px;
+    transform: none; /* Removes shifting for smaller screens */
+  }
+}
+
+/* ✅ Centering Save Buttons */
+.push-config-button,
+.save-settings-button {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  margin: 10px auto;
+  padding: 10px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  text-align: center;
+}
+
+.push-config-button:hover,
+.save-settings-button:hover {
+  background: #218838;
+}
