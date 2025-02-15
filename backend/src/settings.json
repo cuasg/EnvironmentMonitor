@@ -24,21 +24,21 @@
         "ph_check_interval": 301,
         "sensor_update_interval": 10
     },
-    "last_ph_check": "2025-02-14 12:56 PM",
-    "next_ph_check": "2025-02-14 01:56 PM",
+    "last_ph_check": "2025-02-15 08:54 AM",
+    "next_ph_check": "2025-02-15 08:59 AM",
     "last_pump_activation": {
-        "pump": "up",
-        "timestamp": "2025-02-14 12:56 PM"
+        "pump": "down",
+        "timestamp": "2025-02-15 01:40 AM"
     },
-    "ph_voltage": 2.929625,
-    "pH_value": 4.929,
-    "tds_voltage": 1.528,
-    "ppm_500": 528.32,
+    "ph_voltage": 2.7287500000000002,
+    "pH_value": 6.025,
+    "tds_voltage": 1.686,
+    "ppm_500": 678.84,
     "light_sensor": {
         "digital": 0,
-        "analog_voltage": 0.618
+        "analog_voltage": 1.213
     },
-    "humidity": 22.3,
-    "air_temperature_f": 71.24,
-    "water_temperature_f": 68.11
+    "humidity": 29.2,
+    "air_temperature_f": 71.96,
+    "water_temperature_f": 77.0
 }

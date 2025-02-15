@@ -5,6 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import "/src/styles/Dashboard.css";
 import api, { getSettings, updateSettings, connectWebSocket } from "../api";
+import { parse, format } from "date-fns";
 
 const Tile = ({ id, children }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -118,14 +119,33 @@ const Dashboard = () => {
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp || timestamp === "N/A") return "N/A";
-    const date = new Date(timestamp);
-    return date.toLocaleString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
+  
+    try {
+      // Try to parse the date normally
+      let date = new Date(timestamp);
+  
+      // If date is invalid (common in Safari), manually extract time from string
+      if (isNaN(date.getTime())) {
+        console.warn("⚠ Invalid Date Detected, falling back to string parsing:", timestamp);
+        
+        // Extracts time from a format like "2025-02-14 08:45 PM"
+        const timeMatch = timestamp.match(/(\d{1,2}:\d{2} (AM|PM))/);
+        return timeMatch ? timeMatch[0] : timestamp; // Return extracted time or raw string if no match
+      }
+  
+      // Format only hour and minute, 12-hour format
+      return date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } catch (error) {
+      console.error("❌ Error formatting timestamp:", error);
+      return timestamp; // Fallback: Display raw string
+    }
   };
+  
+  
 
   const formatNumber = (num, decimals = 2) => {
     if (num == null || isNaN(num)) return "N/A";
@@ -168,6 +188,43 @@ const Dashboard = () => {
       console.error("❌ Error updating pH monitoring state:", error);
     }
   };
+
+
+  console.log("Next Check Raw:", sensorData.next_ph_check);
+  console.log("Last Check Raw:", sensorData.last_ph_check);
+  console.log("Last Pump Raw:", sensorData.last_pump.timestamp);
+
+
+  const formatDate = (timeString) => {
+    if (!timeString || timeString === "N/A") return "N/A"; // Handle missing values
+  
+    // ✅ Get today’s date
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1; // JS months are 0-based
+    const day = today.getDate();
+  
+    // ✅ Convert timeString into Safari-friendly format: "YYYY/MM/DD HH:MM:SS AM/PM"
+    const fullDateTime = `${year}/${month}/${day} ${timeString}`;
+  
+    // ✅ Create Date Object
+    const date = new Date(fullDateTime);
+  
+    // ✅ Validate Date
+    if (isNaN(date.getTime())) return "Invalid Date";
+  
+    // ✅ Format as "Feb 13, 8:30 PM"
+    return date.toLocaleString("en-US", {
+      month: "short", // "Feb"
+      day: "numeric", // "13"
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+  
+ 
+  
 
   return (
     <div className="dashboard">
@@ -231,12 +288,14 @@ const Dashboard = () => {
                 {tile.id === "history" && (
                   <>
                     <h3>pH History</h3>
-                    <p>Next Check: {sensorData.next_ph_check}</p>
-                    <p>Last Check: {sensorData.last_ph_check}</p>
+                    <p>Next Check: {formatTimestamp(sensorData.next_ph_check)}</p>
+                    <p>Last Check: {formatTimestamp(sensorData.last_ph_check)}</p>
                     <p>
                       Last Pump: {sensorData.last_pump.pump}{" "}
-                      {sensorData.last_pump.timestamp !== "N/A" && `(${sensorData.last_pump.timestamp})`}
+                      {sensorData.last_pump.timestamp && sensorData.last_pump.timestamp !== "N/A" && 
+                        `(${formatTimestamp(sensorData.last_pump.timestamp)})`}
                     </p>
+
                   </>
                 )}
               </Tile>
