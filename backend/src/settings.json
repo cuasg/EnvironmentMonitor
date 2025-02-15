@@ -30,15 +30,15 @@
         "pump": "down",
         "timestamp": "2025-02-15 01:40 AM"
     },
-    "ph_voltage": 2.7287500000000002,
-    "pH_value": 6.025,
-    "tds_voltage": 1.686,
-    "ppm_500": 678.84,
+    "ph_voltage": 2.71975,
+    "pH_value": 6.074,
+    "tds_voltage": 1.69,
+    "ppm_500": 680.83,
     "light_sensor": {
         "digital": 0,
-        "analog_voltage": 1.213
+        "analog_voltage": 1.194
     },
-    "humidity": 29.2,
+    "humidity": 29.1,
     "air_temperature_f": 71.96,
     "water_temperature_f": 77.0
 }
