@@ -1,7 +1,11 @@
 import MultiRangeSlider from "multi-range-slider-react";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "/src/styles/ControlPanel.css";
-import api, { getSettings, updateSettings, connectWebSocket } from "../api";
+import api, { getSettings, updateSettings, connectWebSocket, activatePump as apiActivatePump, changePin, verifyPin, getInfluxConfig, saveInfluxConfig } from "../api";
+import { formatNumber } from "../utils/format";
+import { useAuth, PIN_LENGTH } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import OledEditor from "../components/OledEditor";
 
 const ControlPanel = () => {
   const [settings, setSettings] = useState({
@@ -18,154 +22,328 @@ const ControlPanel = () => {
     sensor_update_interval: 5,
   });
 
+  const [lastSaved, setLastSaved] = useState(null);
+
   const [pumpRunning, setPumpRunning] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const { runWithPin, runWithPinAlways, isAuthenticated, sessionToken, pinConfigured } = useAuth();
+  const { showToast } = useToast();
+  const [changePinCurrent, setChangePinCurrent] = useState("");
+  const [changePinNew, setChangePinNew] = useState("");
+  const [changePinConfirm, setChangePinConfirm] = useState("");
+  const [changePinError, setChangePinError] = useState("");
+  const [changePinSuccess, setChangePinSuccess] = useState(false);
+
+  const [influxConfig, setInfluxConfig] = useState({ url: "", org: "HomeSensors", bucket: "plantMonitor", tokenMasked: "", configured: false });
+  const [influxToken, setInfluxToken] = useState("");
+  const [influxSaveStatus, setInfluxSaveStatus] = useState(null);
+
+  const [controlPanelLoading, setControlPanelLoading] = useState(true);
+  const [controlPanelError, setControlPanelError] = useState(null);
+  const [controlPanelRetry, setControlPanelRetry] = useState(0);
 
   useEffect(() => {
     async function fetchData() {
-      const data = await getSettings();
-      if (data) {
-        setSettings({
-          ...settings,
-          ph_voltage: formatNumber(data.ph_voltage),
-          ph_value: formatNumber(data.pH_value),
-          ph4_voltage: data.ph_calibration?.calibration_points["2-point"]?.ph4_voltage ?? "N/A",
-          ph7_voltage: data.ph_calibration?.calibration_points["2-point"]?.ph7_voltage ?? "N/A",
-          ph10_voltage: data.ph_calibration?.calibration_points["3-point"]?.ph10_voltage ?? "N/A",
-          low_pH: parseFloat(data.pump_settings?.low_pH ?? 5.7),
-          high_pH: parseFloat(data.pump_settings?.high_pH ?? 6.3),
-          pump_duration: parseInt(data.pump_settings?.pump_duration ?? 5),
-          stabilization_time: parseInt(data.pump_settings?.stabilization_time ?? 30),
-          ph_check_interval: parseInt(data.sensor_intervals?.ph_check_interval ?? 600),
-          sensor_update_interval: parseInt(data.sensor_intervals?.sensor_update_interval ?? 5),
-        });
+      setControlPanelLoading(true);
+      setControlPanelError(null);
+      try {
+        const [data, influx] = await Promise.all([getSettings(), getInfluxConfig()]);
+        if (influx) setInfluxConfig(influx);
+        if (data) {
+          const cal2 = data.ph_calibration?.calibration_points?.["2-point"];
+          const cal3 = data.ph_calibration?.calibration_points?.["3-point"];
+          const pump = data.pump_settings;
+          const intervals = data.sensor_intervals;
+          const ph4 = cal2?.ph4_voltage ?? "N/A";
+          const ph7 = cal2?.ph7_voltage ?? "N/A";
+          const ph10 = cal3?.ph10_voltage ?? "N/A";
+          setSettings((prev) => ({
+            ...prev,
+            ph_voltage: formatNumber(data.ph_voltage),
+            ph_value: formatNumber(data.pH_value),
+            ph4_voltage: ph4,
+            ph7_voltage: ph7,
+            ph10_voltage: ph10,
+            low_pH: parseFloat(pump?.low_pH ?? 5.7),
+            high_pH: parseFloat(pump?.high_pH ?? 6.3),
+            pump_duration: parseInt(pump?.pump_duration ?? 5, 10),
+            stabilization_time: parseInt(pump?.stabilization_time ?? 30, 10),
+            ph_check_interval: parseInt(intervals?.ph_check_interval ?? 600, 10),
+            sensor_update_interval: parseInt(intervals?.sensor_update_interval ?? 5, 10),
+          }));
+          setLastSaved({
+            calibration: { ph4_voltage: ph4, ph7_voltage: ph7, ph10_voltage: ph10 },
+            regulation: {
+              low_pH: parseFloat(pump?.low_pH ?? 5.7),
+              high_pH: parseFloat(pump?.high_pH ?? 6.3),
+              pump_duration: parseInt(pump?.pump_duration ?? 5, 10),
+              stabilization_time: parseInt(pump?.stabilization_time ?? 30, 10),
+              ph_check_interval: parseInt(intervals?.ph_check_interval ?? 600, 10),
+              sensor_update_interval: parseInt(intervals?.sensor_update_interval ?? 5, 10),
+            },
+          });
+        }
+      } catch (err) {
+        setControlPanelError("Could not load control panel data.");
+      } finally {
+        setControlPanelLoading(false);
       }
     }
-
     fetchData();
     connectWebSocket(updateSensorData);
-  }, []);
+  }, [controlPanelRetry]);
 
-  const updateSensorData = (data) => {
+  const updateSensorData = useCallback((data) => {
     setSettings((prev) => ({
       ...prev,
       ph_voltage: formatNumber(data.ph_voltage),
       ph_value: formatNumber(data.pH_value),
     }));
-  };
-
-  const formatNumber = (value) => {
-    if (value === "N/A" || value === null || value === undefined) return "N/A";
-    return parseFloat(value).toFixed(value % 1 === 0 ? 0 : 2);
-  };
-
-  const commitCalibration = (type) => {
-    setSettings((prev) => ({
-      ...prev,
-      [`${type}_voltage`]: prev.ph_voltage !== "N/A" ? parseFloat(prev.ph_voltage) : "N/A",
-    }));
-  };
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setSettings((prev) => ({
-      ...prev,
-      [name]: name.includes("pH") ? parseFloat(value) : parseInt(value, 10),
-    }));
+    setSettings((prev) => {
+      if (name === "ph4_voltage" || name === "ph7_voltage" || name === "ph10_voltage") {
+        return {
+          ...prev,
+          [name]: value === "" ? "N/A" : parseFloat(value) || "N/A",
+        };
+      }
+      return {
+        ...prev,
+        [name]: name.includes("pH") ? parseFloat(value) : parseInt(value, 10),
+      };
+    });
   };
 
-  const pushToConfig = async () => {
-    try {
-      await updateSettings({
-        ph_calibration: {
-          calibration_points: {
-            "2-point": {
-              ph4_voltage: settings.ph4_voltage !== "N/A" ? parseFloat(settings.ph4_voltage) : null,
-              ph7_voltage: settings.ph7_voltage !== "N/A" ? parseFloat(settings.ph7_voltage) : null,
-            },
-            "3-point": {
-              ph4_voltage: settings.ph4_voltage !== "N/A" ? parseFloat(settings.ph4_voltage) : null,
-              ph7_voltage: settings.ph7_voltage !== "N/A" ? parseFloat(settings.ph7_voltage) : null,
-              ph10_voltage: settings.ph10_voltage !== "N/A" ? parseFloat(settings.ph10_voltage) : null,
+  const val = (v) => (v === "N/A" || v == null ? "N/A" : Number(v));
+
+  const isCalibrationDirty =
+    lastSaved &&
+    (val(settings.ph4_voltage) !== val(lastSaved.calibration.ph4_voltage) ||
+      val(settings.ph7_voltage) !== val(lastSaved.calibration.ph7_voltage) ||
+      val(settings.ph10_voltage) !== val(lastSaved.calibration.ph10_voltage));
+
+  const isRegulationDirty =
+    lastSaved &&
+    (settings.low_pH !== lastSaved.regulation.low_pH ||
+      settings.high_pH !== lastSaved.regulation.high_pH ||
+      settings.pump_duration !== lastSaved.regulation.pump_duration ||
+      settings.stabilization_time !== lastSaved.regulation.stabilization_time ||
+      settings.ph_check_interval !== lastSaved.regulation.ph_check_interval ||
+      settings.sensor_update_interval !== lastSaved.regulation.sensor_update_interval);
+
+  const pushToConfig = () => {
+    runWithPin(async (token) => {
+      try {
+        await updateSettings(
+          {
+            ph_calibration: {
+              calibration_points: {
+                "2-point": {
+                  ph4_voltage: settings.ph4_voltage !== "N/A" ? parseFloat(settings.ph4_voltage) : null,
+                  ph7_voltage: settings.ph7_voltage !== "N/A" ? parseFloat(settings.ph7_voltage) : null,
+                },
+                "3-point": {
+                  ph4_voltage: settings.ph4_voltage !== "N/A" ? parseFloat(settings.ph4_voltage) : null,
+                  ph7_voltage: settings.ph7_voltage !== "N/A" ? parseFloat(settings.ph7_voltage) : null,
+                  ph10_voltage: settings.ph10_voltage !== "N/A" ? parseFloat(settings.ph10_voltage) : null,
+                },
+              },
             },
           },
-        },
-      });
-      alert("✅ Calibration Settings Updated Successfully!");
-    } catch (error) {
-      alert("❌ Error updating settings.");
-      console.error(error);
+          token
+        );
+        setLastSaved((prev) => ({
+          ...prev,
+          calibration: {
+            ph4_voltage: settings.ph4_voltage,
+            ph7_voltage: settings.ph7_voltage,
+            ph10_voltage: settings.ph10_voltage,
+          },
+        }));
+        showToast("Calibration saved.", "success");
+      } catch (error) {
+        showToast(error.response?.data?.error || "Error updating settings.", "error");
+        console.error(error);
+      }
+    });
+  };
+
+  const savePhRegulationSettings = () => {
+    runWithPin(async (token) => {
+      try {
+        await updateSettings({
+          pump_settings: {
+            low_pH: parseFloat(settings.low_pH),
+            high_pH: parseFloat(settings.high_pH),
+            pump_duration: parseInt(settings.pump_duration),
+            stabilization_time: parseInt(settings.stabilization_time),
+          },
+          sensor_intervals: {
+            ph_check_interval: parseInt(settings.ph_check_interval),
+            sensor_update_interval: parseInt(settings.sensor_update_interval),
+          },
+        }, token);
+        setLastSaved((prev) => ({
+          ...prev,
+          regulation: {
+            low_pH: settings.low_pH,
+            high_pH: settings.high_pH,
+            pump_duration: settings.pump_duration,
+            stabilization_time: settings.stabilization_time,
+            ph_check_interval: settings.ph_check_interval,
+            sensor_update_interval: settings.sensor_update_interval,
+          },
+        }));
+        showToast("Settings saved.", "success");
+      } catch (error) {
+        showToast(error.response?.data?.error || "Error updating settings.", "error");
+        console.error(error);
+      }
+    });
+  };
+
+  const activatePump = (pumpType) => {
+    if (pumpRunning) return;
+    runWithPinAlways(async (token) => {
+      setPumpRunning(true);
+      setCountdown(settings.pump_duration);
+      try {
+        await apiActivatePump(pumpType, settings.pump_duration, token);
+      } catch (error) {
+        showToast(error.response?.data?.error || "Error activating pump.", "error");
+        setPumpRunning(false);
+        return;
+      }
+      let remainingTime = settings.pump_duration;
+      const timer = setInterval(() => {
+        remainingTime -= 1;
+        setCountdown(remainingTime);
+        if (remainingTime <= 0) {
+          clearInterval(timer);
+          setPumpRunning(false);
+        }
+      }, 1000);
+    });
+  };
+
+  const saveInfluxConfigHandler = () => {
+    setInfluxSaveStatus(null);
+    runWithPin(async (sessionToken) => {
+      try {
+        await saveInfluxConfig({
+          url: (influxConfig.url || "").trim(),
+          org: (influxConfig.org || "").trim() || "HomeSensors",
+          bucket: (influxConfig.bucket || "").trim() || "plantMonitor",
+          token: influxToken.trim() || undefined,
+        }, sessionToken);
+        setInfluxToken("");
+        const updated = await getInfluxConfig();
+        setInfluxConfig(updated);
+        setInfluxSaveStatus("saved");
+        showToast("InfluxDB config saved.", "success");
+      } catch (error) {
+        const msg = error.response?.data?.error || "Save failed";
+        setInfluxSaveStatus(msg);
+        showToast(msg, "error");
+      }
+    });
+  };
+
+  const handleChangePin = async (e) => {
+    e.preventDefault();
+    setChangePinError("");
+    setChangePinSuccess(false);
+    if (changePinCurrent.length !== PIN_LENGTH || !/^\d+$/.test(changePinCurrent)) {
+      setChangePinError("Current PIN must be 4 digits");
+      return;
+    }
+    if (changePinNew !== changePinConfirm) {
+      setChangePinError("New PINs do not match");
+      return;
+    }
+    if (changePinNew.length !== PIN_LENGTH || !/^\d+$/.test(changePinNew)) {
+      setChangePinError("New PIN must be 4 digits");
+      return;
+    }
+    try {
+      let token = sessionToken;
+      if (!token) {
+        const data = await verifyPin(changePinCurrent);
+        token = data?.token ?? null;
+        if (!token) {
+          setChangePinError("Wrong current PIN");
+          return;
+        }
+      }
+      await changePin(changePinCurrent, changePinNew, token);
+      setChangePinSuccess(true);
+      setChangePinCurrent("");
+      setChangePinNew("");
+      setChangePinConfirm("");
+    } catch (err) {
+      setChangePinError(err.response?.data?.error || "Failed to change PIN");
     }
   };
 
-  const savePhRegulationSettings = async () => {
-    try {
-      await updateSettings({
-        pump_settings: {
-          low_pH: parseFloat(settings.low_pH),
-          high_pH: parseFloat(settings.high_pH),
-          pump_duration: parseInt(settings.pump_duration),
-          stabilization_time: parseInt(settings.stabilization_time),
-        },
-        sensor_intervals: {
-          ph_check_interval: parseInt(settings.ph_check_interval),
-          sensor_update_interval: parseInt(settings.sensor_update_interval),
-        },
-      });
-      alert("✅ pH Regulation Settings Updated Successfully!");
-    } catch (error) {
-      alert("❌ Error updating pH regulation settings.");
-      console.error(error);
-    }
-  };
-  const activatePump = async (pumpType) => {
-    if (pumpRunning) return;
-  
-    setPumpRunning(true);
-    setCountdown(settings.pump_duration);
-  
-    try {
-      await api.post("/activate-pump", { pump: pumpType, duration: settings.pump_duration });
-      console.log(`✅ Pump ${pumpType === 1 ? "UP" : "DOWN"} activated for ${settings.pump_duration} seconds`);
-    } catch (error) {
-      console.error(`❌ Error activating pump ${pumpType}:`, error);
-    }
-  
-    let remainingTime = settings.pump_duration;
-    const timer = setInterval(() => {
-      remainingTime -= 1;
-      setCountdown(remainingTime);
-      if (remainingTime <= 0) {
-        clearInterval(timer);
-        setPumpRunning(false);
-      }
-    }, 1000);
-  };
-  
   return (
     <div className="control-panel">
       <h1>Control Panel</h1>
-  
+
+      {controlPanelLoading && (
+        <div className="control-panel-loading" aria-live="polite">
+          Loading…
+        </div>
+      )}
+      {controlPanelError && !controlPanelLoading && (
+        <div className="control-panel-error">
+          <p>{controlPanelError}</p>
+          <button type="button" className="control-panel-retry-btn" onClick={() => setControlPanelRetry((r) => r + 1)}>
+            Try again
+          </button>
+        </div>
+      )}
+      {!controlPanelLoading && !controlPanelError && (
+      <>
       {/* 🔹 pH Calibration Section */}
       <div className="section">
         <h2>pH Calibration</h2>
         <p>Current Voltage: {settings.ph_voltage}V | pH: {settings.ph_value}</p>
-        <div className="calibration-row">
-          <label>pH 4 Voltage:</label>
-          <input type="text" value={settings.ph4_voltage} readOnly />
-          <button className="commit-button" onClick={() => commitCalibration("ph4")}>Commit</button>
-        </div>
-        <div className="calibration-row">
-          <label>pH 7 Voltage:</label>
-          <input type="text" value={settings.ph7_voltage} readOnly />
-          <button className="commit-button" onClick={() => commitCalibration("ph7")}>Commit</button>
-        </div>
-        <div className="calibration-row">
-          <label>pH 10 Voltage:</label>
-          <input type="text" value={settings.ph10_voltage} readOnly />
-          <button className="commit-button" onClick={() => commitCalibration("ph10")}>Commit</button>
-        </div>
-        <button className="push-config-button" onClick={pushToConfig}>Push to Config</button>
+        <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "var(--space-xs)" }}>
+          Tip: Use the current voltage reading above to set calibration values.
+        </p>
+        <label>pH 4 Voltage:</label>
+        <input
+          type="number"
+          step="0.001"
+          name="ph4_voltage"
+          value={settings.ph4_voltage === "N/A" ? "" : settings.ph4_voltage}
+          onChange={handleChange}
+          placeholder={settings.ph_voltage !== "N/A" ? `Current: ${settings.ph_voltage}` : "N/A"}
+        />
+        <label>pH 7 Voltage:</label>
+        <input
+          type="number"
+          step="0.001"
+          name="ph7_voltage"
+          value={settings.ph7_voltage === "N/A" ? "" : settings.ph7_voltage}
+          onChange={handleChange}
+          placeholder={settings.ph_voltage !== "N/A" ? `Current: ${settings.ph_voltage}` : "N/A"}
+        />
+        <label>pH 10 Voltage:</label>
+        <input
+          type="number"
+          step="0.001"
+          name="ph10_voltage"
+          value={settings.ph10_voltage === "N/A" ? "" : settings.ph10_voltage}
+          onChange={handleChange}
+          placeholder={settings.ph_voltage !== "N/A" ? `Current: ${settings.ph_voltage}` : "N/A"}
+        />
+        {isCalibrationDirty && (
+          <button className="save-settings-button" onClick={pushToConfig}>Save</button>
+        )}
       </div>
   
       {/* 🔹 pH Regulation Settings */}
@@ -204,7 +382,60 @@ const ControlPanel = () => {
         <label>Sensor Update Interval (sec):</label>
         <input type="number" name="sensor_update_interval" value={settings.sensor_update_interval} onChange={handleChange} />
   
-        <button className="save-settings-button" onClick={savePhRegulationSettings}>Save Settings</button>
+        {isRegulationDirty && (
+          <button className="save-settings-button" onClick={savePhRegulationSettings}>Save</button>
+        )}
+      </div>
+
+      {/* 🔹 OLED Display Configuration */}
+      <div className="section oled-section">
+        <h2>OLED Display Configuration</h2>
+        <OledEditor />
+      </div>
+
+      {/* 🔹 InfluxDB Configuration (PIN protected to save) */}
+      <div className="section">
+        <h2>InfluxDB Configuration</h2>
+        <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
+          Configure your InfluxDB instance for trends and sensor logging. Saving requires your PIN.
+        </p>
+        <label>URL</label>
+        <input
+          type="url"
+          value={influxConfig.url || ""}
+          onChange={(e) => setInfluxConfig((c) => ({ ...c, url: e.target.value }))}
+          placeholder="http://localhost:8086"
+        />
+        <label>Token {influxConfig.tokenMasked && <span style={{ fontWeight: "normal", color: "var(--text-muted)" }}>(current: {influxConfig.tokenMasked})</span>}</label>
+        <input
+          type="password"
+          value={influxToken}
+          onChange={(e) => setInfluxToken(e.target.value)}
+          placeholder="Leave blank to keep current token"
+          autoComplete="off"
+        />
+        <label>Organization</label>
+        <input
+          type="text"
+          value={influxConfig.org || ""}
+          onChange={(e) => setInfluxConfig((c) => ({ ...c, org: e.target.value }))}
+          placeholder="HomeSensors"
+        />
+        <label>Bucket</label>
+        <input
+          type="text"
+          value={influxConfig.bucket || ""}
+          onChange={(e) => setInfluxConfig((c) => ({ ...c, bucket: e.target.value }))}
+          placeholder="plantMonitor"
+        />
+        {influxSaveStatus && (
+          <p style={{ marginTop: "var(--space-sm)", fontSize: "0.875rem", color: influxSaveStatus === "saved" ? "var(--accent)" : "#ef4444" }}>
+            {influxSaveStatus === "saved" ? "✓ InfluxDB config saved." : influxSaveStatus}
+          </p>
+        )}
+        <button type="button" className="save-settings-button" onClick={saveInfluxConfigHandler}>
+          Save InfluxDB Config
+        </button>
       </div>
   
       {/* 🔹 Manual Pump Control */}
@@ -222,9 +453,50 @@ const ControlPanel = () => {
           </button>
         </div>
       </div>
+
+      {/* Change PIN - show when PIN is configured */}
+      {pinConfigured && (
+        <div className="section">
+          <h2>Change PIN</h2>
+          <form onSubmit={handleChangePin}>
+            <label>Current PIN</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={PIN_LENGTH}
+              value={changePinCurrent}
+              onChange={(e) => setChangePinCurrent(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
+              placeholder="••••"
+            />
+            <label>New PIN</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={PIN_LENGTH}
+              value={changePinNew}
+              onChange={(e) => setChangePinNew(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
+              placeholder="••••"
+            />
+            <label>Confirm new PIN</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={PIN_LENGTH}
+              value={changePinConfirm}
+              onChange={(e) => setChangePinConfirm(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
+              placeholder="••••"
+            />
+            {changePinError && <p style={{ color: "#ef4444", fontSize: "0.875rem" }}>{changePinError}</p>}
+            {changePinSuccess && <p style={{ color: "var(--accent)", fontSize: "0.875rem" }}>PIN changed successfully.</p>}
+            <button type="submit" className="save-settings-button">Change PIN</button>
+          </form>
+        </div>
+      )}
+      </>
+      )}
     </div>
   );
-  };
-  
-  export default ControlPanel;
+};
+
+export default ControlPanel;
   

@@ -1,0 +1,86 @@
+.health-page {
+  padding: var(--space-lg);
+  margin-top: 64px;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.health-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 var(--space-lg);
+}
+
+.health-loading,
+.health-error {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.health-error {
+  color: var(--accent);
+  margin-bottom: var(--space-md);
+}
+
+.health-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.health-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.health-indicator {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.health-indicator.ok {
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+}
+
+.health-indicator.error {
+  background: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3);
+}
+
+.health-label {
+  font-weight: 500;
+  color: var(--text);
+  min-width: 140px;
+}
+
+.health-detail {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-left: auto;
+  text-align: right;
+  max-width: 240px;
+}
+
+.health-refresh {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.9375rem;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.health-refresh:hover {
+  border-color: var(--accent);
+  background: rgba(13, 148, 136, 0.08);
+}

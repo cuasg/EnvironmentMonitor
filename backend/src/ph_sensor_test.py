@@ -21,7 +21,7 @@ def load_calibration():
 
 # ✅ pH Conversion Function (Uses 2-point or 3-point Calibration)
 def convert_ph(voltage, calibration_data):
-    """Convert pH sensor voltage using calibration points."""
+    """Convert pH sensor voltage using calibration points with precise step scaling."""
     try:
         mode = calibration_data.get("mode", "2-point")
         cal_points = calibration_data.get("calibration_points", {})
@@ -38,23 +38,29 @@ def convert_ph(voltage, calibration_data):
         if ph4_voltage is None or ph7_voltage is None or (mode == "3-point" and ph10_voltage is None):
             return None
 
-        # ✅ Perform calibration conversion
+        # ✅ pH Calculation with Correct Step Scaling
         if mode == "3-point" and ph10_voltage is not None:
             if voltage >= ph7_voltage:
-                slope = (10.0 - 7.0) / (ph10_voltage - ph7_voltage)
+                slope = (10.0 - 7.0) / (ph10_voltage - ph7_voltage)  # 0.16V per pH
                 ph_value = slope * (voltage - ph7_voltage) + 7.0
             else:
-                slope = (7.0 - 4.0) / (ph7_voltage - ph4_voltage)
+                slope = (7.0 - 4.0) / (ph7_voltage - ph4_voltage)  # 0.1767V per pH
                 ph_value = slope * (voltage - ph7_voltage) + 7.0
         else:
-            slope = (7.0 - 4.0) / (ph7_voltage - ph4_voltage)
+            slope = (7.0 - 4.0) / (ph7_voltage - ph4_voltage)  # 0.1767V per pH
             ph_value = slope * (voltage - ph7_voltage) + 7.0
 
-        return round(ph_value, 3)
+        # ✅ Ensure pH increments in 0.1 steps
+        ph_value = round(ph_value, 1)
+
+        # ✅ Limit pH to 1-14 range
+        return max(1.0, min(14.0, ph_value))
 
     except Exception as e:
         print(f"\n❌ ERROR: pH conversion failed: {e}")
         return None
+
+
 
 # ✅ Initialize I2C for ADS1115 (pH Sensor)
 i2c = busio.I2C(board.SCL, board.SDA)

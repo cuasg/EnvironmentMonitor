@@ -1,0 +1,161 @@
+.influx-status-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: var(--space-lg);
+}
+
+.influx-status-popup {
+  background: var(--bg-card);
+  border: 2px solid #f59e0b;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-width: 500px;
+  width: 100%;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.influx-status-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: #fef3c7;
+}
+
+.influx-status-popup-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.influx-status-popup-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.influx-status-popup-close:hover {
+  color: var(--text);
+}
+
+.influx-status-popup-content {
+  padding: var(--space-md);
+}
+
+.influx-status-popup-content p {
+  margin: 0 0 var(--space-md);
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.influx-status-popup-error {
+  padding: var(--space-sm);
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-md);
+  font-size: 0.875rem;
+  color: #991b1b;
+}
+
+.influx-status-popup-error strong {
+  display: block;
+  margin-bottom: var(--space-xs);
+}
+
+.influx-status-popup-help {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.influx-status-popup-help code {
+  background: var(--bg-card-alt);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+.influx-status-popup-footer {
+  padding: var(--space-md);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.influx-status-popup-configure {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--accent);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.influx-status-popup-configure:hover {
+  background: var(--accent-hover);
+}
+
+.influx-status-popup-dismiss {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.influx-status-popup-dismiss:hover {
+  background: var(--bg-card);
+}
+
+/* Dark mode */
+[data-theme="dark"] .influx-status-popup-header {
+  background: #78350f;
+}
+
+[data-theme="dark"] .influx-status-popup-header h3 {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .influx-status-popup-error {
+  background: #7f1d1d;
+  border-color: #dc2626;
+  color: #fca5a5;
+}

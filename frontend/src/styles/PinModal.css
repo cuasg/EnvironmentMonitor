@@ -1,0 +1,89 @@
+.pin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+}
+
+.pin-modal-card {
+  background: var(--bg-card, #252525);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-md, 8px);
+  padding: 1.5rem;
+  max-width: 320px;
+  width: 90%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.pin-modal-card h2 {
+  margin: 0 0 var(--space-sm);
+  font-size: 1.25rem;
+  color: var(--text, #eee);
+}
+
+.pin-modal-hint {
+  margin: 0 0 var(--space-md);
+  font-size: 0.8rem;
+  color: var(--text-muted, #999);
+}
+
+.pin-modal-input-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+  padding: 0 1rem;
+}
+
+.pin-modal-input {
+  width: 100%;
+  max-width: 200px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1.5rem;
+  letter-spacing: 0.5em;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-alt, #1e1e1e);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.pin-modal-error {
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin: 0 0 var(--space-sm);
+}
+
+.pin-modal-actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
+  margin-top: var(--space-md);
+}
+
+.pin-modal-cancel,
+.pin-modal-try {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+}
+
+.pin-modal-try {
+  background: var(--accent, #0d9488);
+  color: var(--text-inverse, #fff);
+  border-color: var(--accent);
+}
+
+.pin-modal-cancel:hover,
+.pin-modal-try:hover {
+  opacity: 0.9;
+}

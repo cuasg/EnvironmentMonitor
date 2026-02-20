@@ -14,25 +14,30 @@ CST = pytz.timezone("America/Chicago")
 
 
 async def continuous_monitoring():
-    """Continuously reads sensors based on the interval in settings.json and sends data to InfluxDB every 60 seconds."""
+    """Continuously reads sensors based on the interval in settings.json and sends data to InfluxDB at the specified interval."""
     last_db_update = time.time()
 
     while True:
-        # ✅ Reload settings every iteration to capture changes in the sensor update interval
+        # Reload settings every iteration (captures dev_mode and interval changes)
         settings = load_settings()
-        sensor_update_interval = settings["sensor_intervals"].get("sensor_update_interval", 5)  # Default 5 sec
+        sensor_intervals = settings.get("sensor_intervals") or {}
+        sensor_update_interval = sensor_intervals.get("sensor_update_interval", 60)
 
-        print("🔄 Reading sensors...")
         updated_sensor_data = await read_all_sensors()
+        if updated_sensor_data is None:
+            print("⚠ Sensor read failed; keeping previous values. Retrying next interval.")
 
-        # ✅ Send data to InfluxDB every 60 seconds
-        if time.time() - last_db_update >= 60:
-            print("📡 Sending data to InfluxDB...")
+        current_time = time.time()
+        if current_time - last_db_update >= sensor_update_interval:
             await log_sensor_data()
-            last_db_update = time.time()
+            last_db_update = current_time
 
-        print(f"⏳ Waiting for {sensor_update_interval} seconds before next sensor read...")
         await asyncio.sleep(sensor_update_interval)
+
+
+
+
+
 
 
 async def ph_monitoring():
@@ -41,13 +46,13 @@ async def ph_monitoring():
 
     while True:
         settings = load_settings()
-
         if not settings.get("pH_monitoring_enabled", False):
             print("⏸️ pH Monitoring Paused. Waiting for activation...")
             await asyncio.sleep(5)
             continue
 
-        ph_check_interval = settings["sensor_intervals"].get("ph_check_interval", 60)
+        sensor_intervals = settings.get("sensor_intervals") or {}
+        ph_check_interval = sensor_intervals.get("ph_check_interval", 60)
         low_pH = settings["pump_settings"].get("low_pH", 5.7)
         high_pH = settings["pump_settings"].get("high_pH", 6.3)
         pump_duration = settings["pump_settings"].get("pump_duration", 5)
@@ -70,11 +75,11 @@ async def ph_monitoring():
         # ✅ Determine next check time & required sleep duration
         if avg_ph_value < low_pH:
             print(f"⚠ pH too LOW ({avg_ph_value})! Activating pH UP pump...")
-            await activate_pump(1, pump_duration)
+            await activate_pump(1, pump_duration, ph_value=avg_ph_value)
             sleep_time = stabilization_time
         elif avg_ph_value > high_pH:
             print(f"⚠ pH too HIGH ({avg_ph_value})! Activating pH DOWN pump...")
-            await activate_pump(2, pump_duration)
+            await activate_pump(2, pump_duration, ph_value=avg_ph_value)
             sleep_time = stabilization_time
         else:
             print(f"✅ pH is within range ({low_pH} - {high_pH}). No action needed.")

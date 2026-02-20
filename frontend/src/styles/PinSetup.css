@@ -1,0 +1,79 @@
+.pin-setup-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-page, #1a1a1a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.pin-setup-card {
+  background: var(--bg-card, #252525);
+  border: 1px solid var(--border, #333);
+  border-radius: var(--radius-md, 8px);
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.pin-setup-card h1 {
+  margin: 0 0 var(--space-sm);
+  font-size: 1.5rem;
+  color: var(--text, #eee);
+}
+
+.pin-setup-hint {
+  margin: 0 0 var(--space-lg);
+  font-size: 0.9rem;
+  color: var(--text-muted, #999);
+}
+
+.pin-setup-fields {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.pin-setup-fields label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  width: 100%;
+  max-width: 220px;
+}
+
+.pin-input {
+  width: 100%;
+  max-width: 220px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1.25rem;
+  letter-spacing: 0.5em;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-alt, #1e1e1e);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.pin-setup-error {
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin: 0 0 var(--space-sm);
+}
+
+.pin-setup-loading {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin: 0;
+}

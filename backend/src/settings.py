@@ -3,8 +3,13 @@ import os
 import asyncio
 from datetime import datetime
 
-SETTINGS_FILE = "/home/cuasg/plant/backend/src/settings.json"
-BACKUP_FILE = "/home/cuasg/plant/backend/src/settings_backup.json"
+# Use env if set; otherwise same directory as this file (works on Pi and WSL)
+_SETTINGS_DIR = os.environ.get(
+    "PLANT_SETTINGS_DIR",
+    os.path.dirname(os.path.abspath(__file__)),
+)
+SETTINGS_FILE = os.path.join(_SETTINGS_DIR, "settings.json")
+BACKUP_FILE = os.path.join(_SETTINGS_DIR, "settings_backup.json")
 
 # ✅ Ensure timestamps are stored as strings in settings.json
 def ensure_datetime(value):
@@ -52,6 +57,12 @@ def load_settings():
             parsed_pump_timestamp = ensure_datetime(last_pump_timestamp)
             settings["last_pump_activation"]["timestamp"] = last_pump_timestamp if parsed_pump_timestamp is None else parsed_pump_timestamp.strftime("%Y-%m-%d %I:%M %p")
 
+        # ✅ Ensure oled_config exists with default pages if missing
+        if "oled_config" not in settings or not isinstance(settings["oled_config"], dict) or not settings["oled_config"].get("pages"):
+            print("⚠️ OLED config missing or empty, merging defaults...")
+            default_settings = get_default_settings()
+            settings["oled_config"] = default_settings.get("oled_config", {})
+
         return settings
 
     except json.JSONDecodeError:
@@ -94,6 +105,8 @@ async def save_settings(updated_settings):
 
         # ✅ Merge updated settings into current settings
         for key, value in updated_settings.items():
+            if key == "pin_auth":
+                continue  # PIN is managed only by auth module; never overwrite from client
             if isinstance(value, dict) and key in current_settings and isinstance(current_settings[key], dict):
                 current_settings[key].update(value)
             else:
@@ -152,6 +165,7 @@ async def save_settings(updated_settings):
 def get_default_settings():
     """Return default settings in case of error."""
     return {
+        "dev_mode": False,
         "pH_monitoring_enabled": False,
         "ph_calibration": {
             "mode": "2-point",
@@ -170,9 +184,56 @@ def get_default_settings():
             "ph_check_interval": 60,
             "sensor_update_interval": 5
         },
+        "oled_page_interval_seconds": 10,
+        "oled_config": {
+            "pages": [
+                {
+                    "id": "system_status",
+                    "title": "SYSTEM STATUS",
+                    "interval_seconds": 10,
+                    "enabled": True,
+                    "elements": [
+                        {"type": "text", "content": "pH Mon: {pH_monitoring_enabled}", "font_size": 12, "color": "white"},
+                        {"type": "text", "content": "Range: {low_pH}-{high_pH}", "font_size": 12, "color": "white"}
+                    ]
+                },
+                {
+                    "id": "sensor_data",
+                    "title": "SENSORS",
+                    "interval_seconds": 10,
+                    "enabled": True,
+                    "elements": [
+                        {"type": "text", "content": "pH: {pH_value}  PPM: {ppm_500}", "font_size": 12, "color": "white"},
+                        {"type": "text", "content": "Hum: {humidity}%  Air: {air_temperature_f}F", "font_size": 12, "color": "white"},
+                        {"type": "text", "content": "Water: {water_temperature_f}F", "font_size": 12, "color": "white"}
+                    ]
+                },
+                {
+                    "id": "pump_status",
+                    "title": "PUMP STATUS",
+                    "interval_seconds": 10,
+                    "enabled": True,
+                    "elements": [
+                        {"type": "text", "content": "Last: {last_pump_activated}", "font_size": 12, "color": "white"},
+                        {"type": "text", "content": "Time: {last_pump_time}", "font_size": 12, "color": "white"}
+                    ]
+                },
+                {
+                    "id": "ph_check_times",
+                    "title": "pH CHECK TIMES",
+                    "interval_seconds": 10,
+                    "enabled": True,
+                    "elements": [
+                        {"type": "text", "content": "Last: {last_ph_check}", "font_size": 12, "color": "white"},
+                        {"type": "text", "content": "Next: {next_ph_check}", "font_size": 12, "color": "white"}
+                    ]
+                }
+            ]
+        },
         # ✅ Ensure timestamps & last pump activation persist as strings
         "last_ph_check": None,
         "next_ph_check": None,
+        "influx_config": {},
         "last_pump_activation": {"pump": None, "timestamp": None},
         "ph_voltage": None,
         "pH_value": None,

@@ -1,245 +1,315 @@
 .control-panel {
-    max-width: 800px;
-    margin: 20px auto;
-    padding: 20px;
-    background: #f5f5f5;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-xl, 32px);
+  margin-top: 64px;
+  background: var(--bg-card-alt, #f8f9fa);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
 }
 
-h1 {
-    text-align: center;
-    color: #333;
+.control-panel h1 {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-lg, 24px);
+  letter-spacing: -0.02em;
 }
 
-/* 🔹 Section Styling */
+.control-panel-loading {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--text-muted);
+}
+
+.control-panel-error {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--text);
+}
+
+.control-panel-error p {
+  margin: 0 0 var(--space-md);
+}
+
+.control-panel-retry-btn {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  background: var(--accent);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.control-panel-retry-btn:hover {
+  background: var(--accent-hover);
+}
+
 .section {
-    background: white;
-    padding: 20px;
-    margin-bottom: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  background: var(--bg-card);
+  padding: var(--space-lg, 24px);
+  margin-bottom: var(--space-lg, 24px);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  min-width: 0;
 }
 
-h2 {
-    color: #444;
-    border-bottom: 2px solid #ddd;
-    padding-bottom: 5px;
-    margin-bottom: 15px;
+.section.oled-section {
+  max-width: 100%;
 }
 
-/* 🔹 Paragraphs */
-p {
-    font-size: 1rem;
-    color: #555;
-    margin: 5px 0;
+.section h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 2px solid var(--border);
+  padding-bottom: var(--space-sm, 8px);
+  margin-bottom: var(--space-md, 16px);
 }
 
-/* 🔹 Calibration Row Styling */
+.section p {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  margin: var(--space-sm, 8px) 0;
+}
+
 .calibration-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md, 16px);
+  margin: var(--space-md, 16px) 0;
 }
 
 .calibration-row label {
-    flex: 1;
-    font-weight: bold;
-    color: #333;
+  flex: 1;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  color: var(--text);
 }
 
 .calibration-row input {
-    flex: 1;
-    padding: 8px;
-    font-size: 1rem;
-    text-align: center;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background: #f9f9f9;
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--space-sm, 8px) var(--space-md, 16px);
+  font-size: 0.9375rem;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* 🔹 Commit Buttons */
+.calibration-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
 .commit-button {
-    flex: 0.5;
-    padding: 8px 12px;
-    font-size: 0.9rem;
-    font-weight: bold;
-    background: #ff9800; /* Orange for differentiation */
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: 0.3s;
+  flex: 0 0 auto;
+  padding: var(--space-sm, 8px) var(--space-md, 16px);
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: #ea580c;
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.2s ease;
 }
 
 .commit-button:hover {
-    background: #e68900;
+  background: #c2410c;
 }
 
-/* 🔹 Push to Config Button */
-.push-config-button {
-    display: block;
-    width: 50%;
-    margin: 20px auto;
-    padding: 12px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    background: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    text-align: center;
-    transition: 0.3s;
-}
-
-.push-config-button:hover {
-    background: #0056b3;
-}
-
-/* 🔹 Save Settings Button */
+.push-config-button,
 .save-settings-button {
-    display: block;
-    width: 50%;
-    margin: 20px auto;
-    padding: 12px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    background: #28a745;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    text-align: center;
-    transition: 0.3s;
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  margin: var(--space-lg, 24px) auto 0;
+  padding: var(--space-md, 16px);
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  text-align: center;
+}
+
+.push-config-button:hover,
+.save-settings-button:hover {
+  background: var(--accent-hover);
+}
+
+.save-settings-button {
+  background: #16a34a;
 }
 
 .save-settings-button:hover {
-    background: #218838;
+  background: #15803d;
 }
 
-/* 🔹 pH Regulation Section */
 .section label {
-    display: block;
-    font-weight: bold;
-    margin-top: 10px;
-    color: #444;
+  display: block;
+  font-weight: 500;
+  margin-top: var(--space-md, 16px);
+  font-size: 0.9375rem;
+  color: var(--text);
 }
 
 .section input {
-    width: 100%;
-    padding: 8px;
-    font-size: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    margin-top: 5px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--space-sm, 8px) var(--space-md, 16px);
+  font-size: 0.9375rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  margin-top: var(--space-xs, 4px);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* 🔹 Multi-Range Slider */
+.section input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
 .multi-range-slider {
-    width: 95%;
-    margin-top: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin-top: var(--space-sm, 8px);
 }
 
-/* 🔹 Time Input Fields */
 .time-inputs {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 15px;
-    margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md, 16px);
+  margin-top: var(--space-md, 16px);
 }
 
 .time-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .time-group label {
-    font-size: 0.9em;
-    font-weight: bold;
-    margin-bottom: 2px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: var(--space-xs, 4px);
 }
 
 .time-group input {
-    width: 60px;
-    padding: 6px;
-    text-align: center;
-    font-size: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 5px;
+  width: 64px;
+  padding: var(--space-sm, 8px);
+  text-align: center;
+  font-size: 0.9375rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-card-alt);
+  color: var(--text);
 }
 
-/* 🔹 Manual Pump Control Buttons */
 .pump-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin-top: 15px;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md, 16px);
+  margin-top: var(--space-lg, 24px);
 }
 
 .pump-buttons button {
-    width: 45%;
-    padding: 10px;
-    font-size: 1rem;
-    font-weight: bold;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: 0.3s;
+  flex: 1;
+  max-width: 200px;
+  padding: var(--space-md, 16px);
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.05s ease;
 }
 
-/* 🔹 Pump Up Button */
+.pump-buttons button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
 .pump-up-button {
-    background: #17a2b8;
+  background: #0891b2;
 }
 
-.pump-up-button:hover {
-    background: #138496;
+.pump-up-button:hover:not(:disabled) {
+  background: #0e7490;
 }
 
-/* 🔹 Pump Down Button */
 .pump-down-button {
-    background: #dc3545;
+  background: #dc2626;
 }
 
-.pump-down-button:hover {
-    background: #c82333;
+.pump-down-button:hover:not(:disabled) {
+  background: #b91c1c;
 }
 
-/* 🔹 Disabled Buttons */
 button:disabled {
-    background: #aaa;
-    cursor: not-allowed;
+  background: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
-/* 🔹 Responsive Design */
 @media (max-width: 600px) {
-    .calibration-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
+  .control-panel {
+    margin: var(--space-md, 16px);
+    margin-top: 72px;
+    padding: var(--space-md, 16px);
+  }
 
-    .calibration-row button {
-        margin-top: 5px;
-    }
+  .calibration-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
-    .time-inputs {
-        flex-direction: column;
-    }
+  .calibration-row button {
+    margin-top: var(--space-sm, 8px);
+  }
 
-    .time-group {
-        width: 100%;
-    }
+  .time-inputs {
+    flex-direction: column;
+  }
 
-    .section button {
-        width: 100%;
-    }
+  .time-group {
+    width: 100%;
+  }
 
-    .pump-buttons {
-        flex-direction: column;
-    }
+  .section button {
+    width: 100%;
+  }
+
+  .pump-buttons {
+    flex-direction: column;
+  }
+
+  .pump-buttons button {
+    max-width: none;
+  }
 }

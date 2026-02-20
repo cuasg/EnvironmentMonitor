@@ -1,0 +1,163 @@
+.oled-mirror {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.oled-mirror-compact {
+  width: 100%;
+  gap: var(--space-xs);
+}
+
+.oled-mirror-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.oled-mirror-screen {
+  background: #000;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--space-xs) * 2);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  margin: 0 auto;
+  /* Exact 128x64 aspect ratio */
+  aspect-ratio: 128 / 64;
+}
+
+.oled-mirror-compact .oled-mirror-screen {
+  width: 100% !important;
+  max-width: 192px; /* 128 * 1.5 = 192 */
+  height: auto !important;
+  padding: var(--space-xs);
+}
+
+/* Text size variants */
+.oled-mirror-screen.oled-mirror-small .oled-mirror-fallback {
+  font-size: 11px;
+}
+
+.oled-mirror-screen.oled-mirror-small .oled-mirror-line {
+  font-size: 11px;
+}
+
+.oled-mirror-screen.oled-mirror-med .oled-mirror-fallback {
+  font-size: 13px;
+}
+
+.oled-mirror-screen.oled-mirror-med .oled-mirror-line {
+  font-size: 13px;
+}
+
+.oled-mirror-screen.oled-mirror-large .oled-mirror-fallback {
+  font-size: 17px;
+}
+
+.oled-mirror-screen.oled-mirror-large .oled-mirror-line {
+  font-size: 17px;
+}
+
+.oled-mirror-screen.oled-mirror-small .oled-mirror-title {
+  font-size: 11px;
+}
+
+.oled-mirror-screen.oled-mirror-med .oled-mirror-title {
+  font-size: 13px;
+}
+
+.oled-mirror-screen.oled-mirror-large .oled-mirror-title {
+  font-size: 17px;
+}
+
+/* Compact mode base font size - will be overridden by text size classes */
+.oled-mirror-compact .oled-mirror-fallback {
+  font-size: 7px;
+}
+
+.oled-mirror-compact .oled-mirror-title {
+  font-size: 9px;
+}
+
+.oled-mirror-compact .oled-mirror-line {
+  font-size: 7px;
+}
+
+/* Text size classes should override compact mode */
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-small .oled-mirror-fallback {
+  font-size: 11px;
+}
+
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-small .oled-mirror-line {
+  font-size: 11px;
+}
+
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-small .oled-mirror-title {
+  font-size: 11px;
+}
+
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-med .oled-mirror-fallback {
+  font-size: 13px;
+}
+
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-med .oled-mirror-line {
+  font-size: 13px;
+}
+
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-med .oled-mirror-title {
+  font-size: 13px;
+}
+
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-large .oled-mirror-fallback {
+  font-size: 17px;
+}
+
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-large .oled-mirror-line {
+  font-size: 17px;
+}
+
+.oled-mirror-compact .oled-mirror-screen.oled-mirror-large .oled-mirror-title {
+  font-size: 17px;
+}
+
+.oled-mirror-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  font-family: monospace;
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 2px;
+  overflow: hidden;
+  justify-content: flex-start;
+  align-items: center;
+  text-align: center;
+}
+
+.oled-mirror-title {
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 4px;
+  text-align: center;
+  width: 100%;
+}
+
+.oled-mirror-line {
+  font-size: 10px;
+  margin-bottom: 2px;
+  text-align: center;
+  width: 100%;
+}
+
+.oled-mirror-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

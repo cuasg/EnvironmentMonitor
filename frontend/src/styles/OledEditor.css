@@ -1,0 +1,324 @@
+.oled-editor {
+  display: flex;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.oled-editor-left {
+  flex: 1;
+  min-width: 300px;
+}
+
+.oled-editor-right {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.oled-preview-controls {
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-sm);
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+
+.oled-preview-controls label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.9375rem;
+  color: var(--text);
+}
+
+.oled-preview-controls select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.oled-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.oled-editor-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.oled-btn-add {
+  padding: 8px 14px;
+  font-size: 0.9375rem;
+  background: var(--accent);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.oled-btn-add:hover {
+  background: var(--accent-hover);
+}
+
+.oled-pages-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.oled-page-item {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-alt);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.oled-page-item:hover {
+  border-color: var(--accent);
+}
+
+.oled-page-item.active {
+  border-color: var(--accent);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.2);
+}
+
+.oled-page-title-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 0.9375rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  margin-bottom: var(--space-xs);
+  box-sizing: border-box;
+}
+
+.oled-page-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.oled-page-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-sm);
+}
+
+.oled-page-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.oled-page-settings input {
+  padding: 10px 12px;
+  font-size: 0.9375rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.oled-elements-section {
+  margin-bottom: var(--space-md);
+}
+
+.oled-elements-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.oled-elements-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Drop zone: drag variables here to add a line */
+.oled-variable-drop-zone {
+  padding: 14px 16px;
+  margin-bottom: var(--space-sm);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-alt);
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.oled-variable-drop-zone-over {
+  border-color: var(--accent);
+  background: rgba(13, 148, 136, 0.08);
+}
+
+.oled-variable-drop-zone-text {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.oled-elements-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.oled-element-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px 12px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+  min-height: 48px;
+}
+
+.oled-element-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 1rem;
+  user-select: none;
+  padding: 4px 8px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.oled-element-handle:active {
+  cursor: grabbing;
+}
+
+.oled-element-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 10px 12px;
+  font-size: 0.9375rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.oled-element-controls {
+  display: flex;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.oled-element-select {
+  padding: 8px 10px;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  min-width: 82px;
+  min-height: 40px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.oled-element-select:hover {
+  border-color: var(--accent);
+}
+
+.oled-element-delete {
+  padding: 8px 12px;
+  font-size: 1.125rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+  min-height: 40px;
+  flex-shrink: 0;
+}
+
+.oled-element-delete:hover {
+  background: #b91c1c;
+}
+
+.oled-variables-help {
+  padding: var(--space-md);
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.oled-variables-help strong {
+  display: block;
+  margin-bottom: var(--space-sm);
+  font-size: 0.9375rem;
+  color: var(--text);
+}
+
+.oled-variables-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.oled-variable-tag {
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.oled-variable-tag:hover {
+  border-color: var(--accent);
+  background: rgba(13, 148, 136, 0.08);
+}
+
+.oled-variable-tag:active {
+  cursor: grabbing;
+}
+
+.oled-variable-tag-dragging {
+  opacity: 0.6;
+}

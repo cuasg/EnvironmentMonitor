@@ -1,0 +1,305 @@
+/* Design tokens and theming – single source for layout and contrast */
+
+:root,
+[data-theme="light"] {
+  /* Surfaces */
+  --bg-page: #f5f6f8;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f8f9fa;
+  --bg-nav: #1e293b;
+  --bg-dropdown: #334155;
+  /* Text – WCAG AA on backgrounds */
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --text-inverse: #f8fafc;
+  /* Borders & shadows */
+  --border: #e2e8f0;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  /* Layout */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  /* Accent */
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+
+  /* Responsive breakpoints (use in media queries) */
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+  /* Touch-friendly minimum */
+  --touch-min: 44px;
+}
+
+[data-theme="dark"] {
+  --bg-page: #0f172a;
+  --bg-card: #1e293b;
+  --bg-card-alt: #334155;
+  --bg-nav: #0f172a;
+  --bg-dropdown: #334155;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-inverse: #f8fafc;
+  --border: #475569;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+html {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+[data-theme="dark"] body {
+  background-color: var(--bg-page);
+  color: var(--text);
+}
+
+.app-main {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--accent);
+  color: var(--text-inverse);
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  z-index: 2000;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: var(--space-md);
+  outline: 2px solid var(--text-inverse);
+  outline-offset: 2px;
+}
+
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: var(--space-md);
+  background: var(--bg-page);
+}
+
+.app-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: app-loading-spin 0.8s linear infinite;
+}
+
+.app-loading-text {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+@keyframes app-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dashboard */
+[data-theme="dark"] .dashboard {
+  background-color: var(--bg-page);
+  color: var(--text);
+}
+
+[data-theme="dark"] .dashboard-title {
+  color: var(--text);
+}
+
+[data-theme="dark"] .tile {
+  background-color: var(--bg-card);
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .tile:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+[data-theme="dark"] .tile h3,
+[data-theme="dark"] .tile p {
+  color: var(--text);
+}
+
+/* Light sensor status – readable in dark mode */
+[data-theme="dark"] .light-intensity.high {
+  color: #4ade80;
+}
+[data-theme="dark"] .light-intensity.med {
+  color: #facc15;
+}
+[data-theme="dark"] .light-intensity.low {
+  color: #f87171;
+}
+
+[data-theme="dark"] .pump-up {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .pump-down {
+  color: #f87171;
+}
+
+/* Control Panel */
+[data-theme="dark"] .control-panel {
+  background-color: var(--bg-card-alt);
+  color: var(--text);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .control-panel h1 {
+  color: var(--text);
+}
+
+[data-theme="dark"] .section {
+  background-color: var(--bg-card);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .section h2 {
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .control-panel p,
+[data-theme="dark"] .section label,
+[data-theme="dark"] .calibration-row label {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .calibration-row input,
+[data-theme="dark"] .section input,
+[data-theme="dark"] .time-group input {
+  background-color: var(--bg-card-alt);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+[data-theme="dark"] input::placeholder {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .dropdown-menu {
+  background-color: var(--bg-dropdown);
+  border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .dropdown-item,
+[data-theme="dark"] .dropdown-item-indicator {
+  color: var(--text-inverse);
+}
+
+[data-theme="dark"] .dropdown-item-indicator .indicator-on {
+  color: #86efac;
+}
+
+/* Trends */
+[data-theme="dark"] .trends-page {
+  background-color: var(--bg-page);
+  color: var(--text);
+}
+
+[data-theme="dark"] .trends-title {
+  color: var(--text);
+}
+
+/* Grow Info */
+[data-theme="dark"] .grow-info-page {
+  background-color: var(--bg-page);
+  color: var(--text);
+}
+
+[data-theme="dark"] .grow-info-title {
+  color: var(--text);
+}
+
+[data-theme="dark"] .grow-info-tile {
+  background-color: var(--bg-card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .grow-info-tile-title {
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .nutrient-calc-input,
+[data-theme="dark"] .nutrient-calc-select {
+  background-color: var(--bg-card-alt);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Kiosk mode: no navbar, full-height content, fullscreen button */
+.app-kiosk .app-main {
+  margin-top: 0;
+}
+
+.app-kiosk .dashboard,
+.app-kiosk .kiosk-wrapper .dashboard {
+  margin-top: 0;
+  min-height: 100vh;
+}
+
+.kiosk-wrapper {
+  position: relative;
+  min-height: 100%;
+}
+
+.kiosk-fullscreen-btn {
+  position: fixed;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  z-index: 1000;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+}
+
+.kiosk-fullscreen-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
