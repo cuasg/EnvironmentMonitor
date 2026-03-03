@@ -163,3 +163,42 @@
 .nutrient-calc-track-status.error {
   color: #dc2626;
 }
+
+.nutrient-calc-row-multi {
+  align-items: flex-start;
+}
+
+.nutrient-calc-input-name {
+  flex: 1 1 100%;
+}
+
+.nutrient-calc-row-strength {
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nutrient-calc-label-inline {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-right: var(--space-sm);
+}
+
+.nutrient-calc-add-btn {
+  margin-top: var(--space-sm);
+}
+
+.nutrient-calc-remove-btn {
+  padding: var(--space-xs) var(--space-md);
+  font-size: 0.8125rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid #f97316;
+  background: rgba(249, 115, 22, 0.06);
+  color: #f97316;
+  cursor: pointer;
+}
+
+.nutrient-calc-remove-btn:hover {
+  background: rgba(249, 115, 22, 0.16);
+}

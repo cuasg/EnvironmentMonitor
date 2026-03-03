@@ -548,9 +548,26 @@ async def export_grow_logs():
     if fmt == "csv":
         rows = list(export_grows_to_csv_rows())
         fieldnames = list(rows[0].keys()) if rows else [
-            "grow_id", "start_date", "strains", "is_primary", "grow_notes",
-            "entry_id", "entry_type", "timestamp", "pump_direction", "ph_value", "is_manual",
-            "nutrient_amount", "nutrient_unit", "strength_percent", "volume", "volume_unit", "note_text", "content",
+            "grow_id",
+            "start_date",
+            "strains",
+            "is_primary",
+            "grow_notes",
+            "entry_id",
+            "entry_type",
+            "timestamp",
+            "pump_direction",
+            "pump_duration",
+            "ph_value",
+            "is_manual",
+            "nutrient_amount",
+            "nutrient_unit",
+            "strength_percent",
+            "nutrients",
+            "volume",
+            "volume_unit",
+            "note_text",
+            "content",
         ]
         out = io.StringIO()
         writer = csv.DictWriter(out, fieldnames=fieldnames, extrasaction="ignore")

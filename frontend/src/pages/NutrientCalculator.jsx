@@ -33,59 +33,121 @@ function toGallons(amount, unit) {
   return amount / GALLONS_TO_LITERS;
 }
 
+function createNutrientRow(overrides = {}) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: "",
+    doseAmount: "",
+    doseUnit: "grams",
+    dosePerAmount: "",
+    dosePerUnit: "liters",
+    strengthPercent: 100,
+    ...overrides,
+  };
+}
+
 const NutrientCalculator = () => {
-  const [reservoirAmount, setReservoirAmount] = useState(() => loadNutrientCalcSaved()?.reservoirAmount ?? "");
-  const [reservoirUnit, setReservoirUnit] = useState(() => loadNutrientCalcSaved()?.reservoirUnit ?? "gallons");
+  const saved = loadNutrientCalcSaved();
 
-  const [nutrientAmount, setNutrientAmount] = useState(() => loadNutrientCalcSaved()?.nutrientAmount ?? "");
-  const [nutrientUnit, setNutrientUnit] = useState(() => loadNutrientCalcSaved()?.nutrientUnit ?? "grams");
-  const [perVolumeAmount, setPerVolumeAmount] = useState(() => loadNutrientCalcSaved()?.perVolumeAmount ?? "");
-  const [perVolumeUnit, setPerVolumeUnit] = useState(() => loadNutrientCalcSaved()?.perVolumeUnit ?? "liters");
+  const [reservoirAmount, setReservoirAmount] = useState(() => saved?.reservoirAmount ?? "");
+  const [reservoirUnit, setReservoirUnit] = useState(() => saved?.reservoirUnit ?? "gallons");
 
-  const [strengthPercent, setStrengthPercent] = useState(() => {
-    const s = loadNutrientCalcSaved();
-    return typeof s?.strengthPercent === "number" ? s.strengthPercent : 100;
+  const [nutrients, setNutrients] = useState(() => {
+    if (saved && Array.isArray(saved.nutrients) && saved.nutrients.length > 0) {
+      return saved.nutrients.map((n) =>
+        createNutrientRow({
+          id: n.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: n.name || "",
+          doseAmount: n.doseAmount ?? "",
+          doseUnit: n.doseUnit || "grams",
+          dosePerAmount: n.dosePerAmount ?? "",
+          dosePerUnit: n.dosePerUnit || "liters",
+          strengthPercent:
+            typeof n.strengthPercent === "number" && !Number.isNaN(n.strengthPercent) ? n.strengthPercent : 100,
+        }),
+      );
+    }
+
+    if (saved && (saved.nutrientAmount || saved.perVolumeAmount)) {
+      return [
+        createNutrientRow({
+          doseAmount: saved.nutrientAmount ?? "",
+          doseUnit: saved.nutrientUnit || "grams",
+          dosePerAmount: saved.perVolumeAmount ?? "",
+          dosePerUnit: saved.perVolumeUnit || "liters",
+          strengthPercent:
+            typeof saved.strengthPercent === "number" && !Number.isNaN(saved.strengthPercent)
+              ? saved.strengthPercent
+              : 100,
+        }),
+      ];
+    }
+
+    return [createNutrientRow()];
   });
-  const [result, setResult] = useState(null);
+
+  const [results, setResults] = useState(null);
   const [trackStatus, setTrackStatus] = useState(null);
   const [tracking, setTracking] = useState(false);
 
   const calculate = () => {
     const res = parseFloat(reservoirAmount);
-    const amt = parseFloat(nutrientAmount);
-    const perVol = parseFloat(perVolumeAmount);
-
-    if (Number.isNaN(res) || Number.isNaN(amt) || Number.isNaN(perVol) || perVol <= 0 || res <= 0) {
-      setResult(null);
+    if (Number.isNaN(res) || res <= 0) {
+      setResults(null);
       return;
     }
 
-    let reservoirInPerUnit;
-    if (perVolumeUnit === "liters") {
-      reservoirInPerUnit = toLiters(res, reservoirUnit);
-    } else {
-      reservoirInPerUnit = toGallons(res, reservoirUnit);
+    const perNutrient = [];
+    const totalsByUnit = {};
+
+    nutrients.forEach((row) => {
+      const amt = parseFloat(row.doseAmount);
+      const perVol = parseFloat(row.dosePerAmount);
+      if (Number.isNaN(amt) || Number.isNaN(perVol) || perVol <= 0) {
+        return;
+      }
+
+      let reservoirInPerUnit;
+      if (row.dosePerUnit === "liters") {
+        reservoirInPerUnit = toLiters(res, reservoirUnit);
+      } else {
+        reservoirInPerUnit = toGallons(res, reservoirUnit);
+      }
+
+      const rawNeed = (reservoirInPerUnit / perVol) * amt;
+      const finalNeed = rawNeed * (row.strengthPercent / 100);
+
+      const result = {
+        id: row.id,
+        name: row.name || "",
+        amount: finalNeed,
+        unit: row.doseUnit,
+        strengthPercent: row.strengthPercent,
+      };
+      perNutrient.push(result);
+
+      if (!Number.isNaN(finalNeed)) {
+        const key = row.doseUnit;
+        totalsByUnit[key] = (totalsByUnit[key] || 0) + finalNeed;
+      }
+    });
+
+    if (perNutrient.length === 0) {
+      setResults(null);
+      return;
     }
 
-    const rawNeed = (reservoirInPerUnit / perVol) * amt;
-    const finalNeed = rawNeed * (strengthPercent / 100);
-    setResult({ value: finalNeed, unit: nutrientUnit });
+    setResults({ perNutrient, totalsByUnit });
 
     saveNutrientCalcSaved({
       reservoirAmount,
       reservoirUnit,
-      nutrientAmount,
-      nutrientUnit,
-      perVolumeAmount,
-      perVolumeUnit,
-      strengthPercent,
-      calculatedAmount: finalNeed,
-      calculatedUnit: nutrientUnit,
+      nutrients,
     });
   };
 
   const trackToGrowLog = async () => {
-    if (result == null) return;
+    if (!results || !results.perNutrient || results.perNutrient.length === 0) return;
     setTrackStatus(null);
     setTracking(true);
     try {
@@ -101,15 +163,16 @@ const NutrientCalculator = () => {
       const resVolume = parseFloat(reservoirAmount);
       const resUnit = reservoirUnit || "gallons";
 
-      const amountTwoDecimals = Number.isFinite(result.value)
-        ? Math.round(result.value * 100) / 100
-        : result.value;
+      const nutrientsPayload = results.perNutrient.map((n) => ({
+        name: n.name || null,
+        amount: Number.isFinite(n.amount) ? Math.round(n.amount * 100) / 100 : n.amount,
+        unit: n.unit,
+        strength_percent: n.strengthPercent,
+      }));
       await addGrowEntry(primary.id, {
         type: "feeding",
         timestamp,
-        nutrient_amount: amountTwoDecimals,
-        nutrient_unit: result.unit,
-        strength_percent: strengthPercent,
+        nutrients: nutrientsPayload,
       });
       await addGrowEntry(primary.id, {
         type: "res_change",
@@ -124,11 +187,6 @@ const NutrientCalculator = () => {
       setTracking(false);
     }
   };
-
-  const resultDisplay =
-    result != null
-      ? `${result.value.toFixed(2)} ${result.unit} needed`
-      : null;
 
   return (
     <div className="grow-info-page">
@@ -162,65 +220,143 @@ const NutrientCalculator = () => {
           </div>
 
           <div className="nutrient-calc-section">
-            <label className="nutrient-calc-label">Nutrient mix (amount per volume of water)</label>
-            <div className="nutrient-calc-row nutrient-calc-ratio">
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="e.g. 5 or 5.5"
-                value={nutrientAmount}
-                onChange={(e) => setNutrientAmount(e.target.value)}
-                className="nutrient-calc-input"
-              />
-              <select
-                value={nutrientUnit}
-                onChange={(e) => setNutrientUnit(e.target.value)}
-                className="nutrient-calc-select"
-              >
-                <option value="grams">grams</option>
-                <option value="ml">ml</option>
-              </select>
-              <span className="nutrient-calc-per">per</span>
-              <input
-                type="number"
-                min="0.001"
-                step="any"
-                placeholder="e.g. 1"
-                value={perVolumeAmount}
-                onChange={(e) => setPerVolumeAmount(e.target.value)}
-                className="nutrient-calc-input"
-              />
-              <select
-                value={perVolumeUnit}
-                onChange={(e) => setPerVolumeUnit(e.target.value)}
-                className="nutrient-calc-select"
-              >
-                <option value="liters">liters</option>
-                <option value="gallons">gallons</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="nutrient-calc-section">
-            <label className="nutrient-calc-label">Strength: {strengthPercent}%</label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={strengthPercent}
-              onChange={(e) => setStrengthPercent(Number(e.target.value))}
-              className="nutrient-calc-slider"
-            />
+            <label className="nutrient-calc-label">Nutrients (amount per volume of water)</label>
+            {nutrients.map((row, index) => (
+              <div key={row.id} className="nutrient-calc-row nutrient-calc-ratio nutrient-calc-row-multi">
+                <input
+                  type="text"
+                  placeholder={`Nutrient ${index + 1} (e.g. Part A, CalMag)`}
+                  value={row.name}
+                  onChange={(e) => {
+                    const next = nutrients.map((n) =>
+                      n.id === row.id ? { ...n, name: e.target.value } : n,
+                    );
+                    setNutrients(next);
+                  }}
+                  className="nutrient-calc-input nutrient-calc-input-name"
+                />
+                <div className="nutrient-calc-row">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g. 5 or 5.5"
+                    value={row.doseAmount}
+                    onChange={(e) => {
+                      const next = nutrients.map((n) =>
+                        n.id === row.id ? { ...n, doseAmount: e.target.value } : n,
+                      );
+                      setNutrients(next);
+                    }}
+                    className="nutrient-calc-input"
+                  />
+                  <select
+                    value={row.doseUnit}
+                    onChange={(e) => {
+                      const next = nutrients.map((n) =>
+                        n.id === row.id ? { ...n, doseUnit: e.target.value } : n,
+                      );
+                      setNutrients(next);
+                    }}
+                    className="nutrient-calc-select"
+                  >
+                    <option value="grams">grams</option>
+                    <option value="ml">ml</option>
+                  </select>
+                  <span className="nutrient-calc-per">per</span>
+                  <input
+                    type="number"
+                    min="0.001"
+                    step="any"
+                    placeholder="e.g. 1"
+                    value={row.dosePerAmount}
+                    onChange={(e) => {
+                      const next = nutrients.map((n) =>
+                        n.id === row.id ? { ...n, dosePerAmount: e.target.value } : n,
+                      );
+                      setNutrients(next);
+                    }}
+                    className="nutrient-calc-input"
+                  />
+                  <select
+                    value={row.dosePerUnit}
+                    onChange={(e) => {
+                      const next = nutrients.map((n) =>
+                        n.id === row.id ? { ...n, dosePerUnit: e.target.value } : n,
+                      );
+                      setNutrients(next);
+                    }}
+                    className="nutrient-calc-select"
+                  >
+                    <option value="liters">liters</option>
+                    <option value="gallons">gallons</option>
+                  </select>
+                </div>
+                <div className="nutrient-calc-row nutrient-calc-row-strength">
+                  <label className="nutrient-calc-label-inline">
+                    Strength: {row.strengthPercent}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={row.strengthPercent}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      const next = nutrients.map((n) =>
+                        n.id === row.id ? { ...n, strengthPercent: value } : n,
+                      );
+                      setNutrients(next);
+                    }}
+                    className="nutrient-calc-slider"
+                  />
+                  {nutrients.length > 1 && (
+                    <button
+                      type="button"
+                      className="nutrient-calc-remove-btn"
+                      onClick={() => {
+                        setNutrients(nutrients.filter((n) => n.id !== row.id));
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="nutrient-calc-btn nutrient-calc-add-btn"
+              onClick={() => setNutrients([...nutrients, createNutrientRow()])}
+            >
+              + Add nutrient
+            </button>
           </div>
 
           <button type="button" onClick={calculate} className="nutrient-calc-btn">
             Calculate
           </button>
 
-          {resultDisplay && (
+          {results && results.perNutrient && results.perNutrient.length > 0 && (
             <div className="nutrient-calc-result">
-              <strong>{resultDisplay}</strong>
+              <strong>Per nutrient:</strong>
+              <ul className="nutrient-calc-result-list">
+                {results.perNutrient.map((n, idx) => (
+                  <li key={n.id}>
+                    {n.name || `Nutrient ${idx + 1}`}:{" "}
+                    <strong>{Number.isFinite(n.amount) ? n.amount.toFixed(2) : n.amount} {n.unit}</strong>{" "}
+                    @ {n.strengthPercent}%
+                  </li>
+                ))}
+              </ul>
+              {results.totalsByUnit && Object.keys(results.totalsByUnit).length > 0 && (
+                <div className="nutrient-calc-totals">
+                  <strong>Totals:</strong>{" "}
+                  {Object.entries(results.totalsByUnit)
+                    .map(([unit, amt]) => `${amt.toFixed(2)} ${unit}`)
+                    .join(", ")}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={trackToGrowLog}

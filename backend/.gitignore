@@ -1,0 +1,22 @@
+# Secrets (never commit)
+.env
+.env.local
+src/.env
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.eggs/
+
+# Runtime data (created/updated by app)
+src/grow_logs.json
+src/settings.json
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

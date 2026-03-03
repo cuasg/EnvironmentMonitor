@@ -394,13 +394,6 @@ const Dashboard = () => {
     runWithPinAlways(async (token) => {
       setPumpRunning(true);
       setPumpCountdown(duration);
-      try {
-        await apiActivatePump(pumpType, duration, token);
-      } catch (error) {
-        showToast(error.response?.data?.error || "Error activating pump.", "error");
-        setPumpRunning(false);
-        return;
-      }
       let remaining = duration;
       const timer = setInterval(() => {
         remaining -= 1;
@@ -410,6 +403,14 @@ const Dashboard = () => {
           setPumpRunning(false);
         }
       }, 1000);
+      try {
+        await apiActivatePump(pumpType, duration, token);
+      } catch (error) {
+        clearInterval(timer);
+        showToast(error.response?.data?.error || "Error activating pump.", "error");
+        setPumpRunning(false);
+        setPumpCountdown(0);
+      }
     });
   };
 

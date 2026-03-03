@@ -208,16 +208,10 @@ const ControlPanel = () => {
   const activatePump = (pumpType) => {
     if (pumpRunning) return;
     runWithPinAlways(async (token) => {
+      const duration = settings.pump_duration;
       setPumpRunning(true);
-      setCountdown(settings.pump_duration);
-      try {
-        await apiActivatePump(pumpType, settings.pump_duration, token);
-      } catch (error) {
-        showToast(error.response?.data?.error || "Error activating pump.", "error");
-        setPumpRunning(false);
-        return;
-      }
-      let remainingTime = settings.pump_duration;
+      setCountdown(duration);
+      let remainingTime = duration;
       const timer = setInterval(() => {
         remainingTime -= 1;
         setCountdown(remainingTime);
@@ -226,6 +220,14 @@ const ControlPanel = () => {
           setPumpRunning(false);
         }
       }, 1000);
+      try {
+        await apiActivatePump(pumpType, duration, token);
+      } catch (error) {
+        clearInterval(timer);
+        showToast(error.response?.data?.error || "Error activating pump.", "error");
+        setPumpRunning(false);
+        setCountdown(0);
+      }
     });
   };
 

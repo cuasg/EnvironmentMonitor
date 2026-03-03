@@ -315,6 +315,12 @@ const GrowLog = () => {
   };
 
   const handleEditEntry = (entry, grow) => {
+    // Multi-nutrient feedings are logged via the calculator and are currently
+    // read-only from this screen to avoid losing per-nutrient detail.
+    if (entry.type === "feeding" && Array.isArray(entry.nutrients) && entry.nutrients.length > 0) {
+      showToast("Editing multi-nutrient feedings is not supported here. Log a new feeding from the Nutrient Calculator.", "error");
+      return;
+    }
     setSelectedGrowId(grow.id);
     setEditingEntry(entry);
     setNewEntryForm({
@@ -558,8 +564,29 @@ const GrowLog = () => {
                                   )}
                                   {entry.type === "feeding" && (
                                     <div>
-                                      Amount: <strong>{entry.nutrient_amount} {entry.nutrient_unit}</strong> •{" "}
-                                      Strength: <strong>{entry.strength_percent}%</strong>
+                                      {Array.isArray(entry.nutrients) && entry.nutrients.length > 0 ? (
+                                        <>
+                                          <div><strong>Nutrients:</strong></div>
+                                          <ul className="entry-nutrients-list">
+                                            {entry.nutrients.map((n, idx) => (
+                                              <li key={n.name || idx}>
+                                                {(n.name || `Nutrient ${idx + 1}`) + ": "}
+                                                <strong>
+                                                  {n.amount} {n.unit}
+                                                </strong>
+                                                {typeof n.strength_percent === "number" && !Number.isNaN(n.strength_percent) && (
+                                                  <> @ {n.strength_percent}%</>
+                                                )}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </>
+                                      ) : (
+                                        <div>
+                                          Amount: <strong>{entry.nutrient_amount} {entry.nutrient_unit}</strong> •{" "}
+                                          Strength: <strong>{entry.strength_percent}%</strong>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                   {entry.type === "note" && <div>{entry.note_text}</div>}

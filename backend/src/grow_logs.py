@@ -26,6 +26,96 @@ def _normalize_strain(s, grow_start_date):
     return s
 
 
+def _normalize_feeding_entry(entry):
+    """
+    Normalize feeding entries to the new schema with a per-nutrient list.
+
+    Legacy shape:
+      {
+        "type": "feeding",
+        "timestamp": "...",
+        "nutrient_amount": 10,
+        "nutrient_unit": "grams",
+        "strength_percent": 100,
+        ...
+      }
+
+    New shape:
+      {
+        "type": "feeding",
+        "timestamp": "...",
+        "nutrients": [
+          {
+            "name": <optional>,
+            "amount": 10,
+            "unit": "grams",
+            "strength_percent": 100,
+          },
+          ...
+        ],
+        ...
+      }
+    """
+    if not isinstance(entry, dict):
+        return entry
+
+    # Already new-style: normalize each nutrient dict
+    if isinstance(entry.get("nutrients"), list) and entry["nutrients"]:
+        normalized_nutrients = []
+        for n in entry["nutrients"]:
+            if not isinstance(n, dict):
+                continue
+            amount = n.get("amount")
+            try:
+                amount = float(amount) if amount is not None else None
+            except (TypeError, ValueError):
+                amount = None
+            strength = n.get("strength_percent", 100)
+            try:
+                strength = int(strength)
+            except (TypeError, ValueError):
+                strength = 100
+            normalized_nutrients.append(
+                {
+                    "name": (n.get("name") or None),
+                    "amount": amount,
+                    "unit": (n.get("unit") or "grams"),
+                    "strength_percent": strength,
+                }
+            )
+        entry["nutrients"] = normalized_nutrients
+        return entry
+
+    # Legacy single-nutrient fields -> wrap into a list
+    legacy_amount = entry.get("nutrient_amount")
+    legacy_unit = entry.get("nutrient_unit") or "grams"
+    legacy_strength = entry.get("strength_percent", 100)
+
+    if legacy_amount is None and legacy_unit is None and legacy_strength is None:
+        # Nothing to normalize
+        return entry
+
+    try:
+        legacy_amount = float(legacy_amount) if legacy_amount is not None else None
+    except (TypeError, ValueError):
+        legacy_amount = None
+
+    try:
+        legacy_strength = int(legacy_strength)
+    except (TypeError, ValueError):
+        legacy_strength = 100
+
+    entry["nutrients"] = [
+        {
+            "name": None,
+            "amount": legacy_amount,
+            "unit": legacy_unit,
+            "strength_percent": legacy_strength,
+        }
+    ]
+    return entry
+
+
 def _normalize_grow(grow):
     """Ensure grow has strains (list) with per-strain fields. No harvest_date at grow level."""
     if not isinstance(grow, dict):
@@ -34,13 +124,29 @@ def _normalize_grow(grow):
     if "strains" not in grow or not isinstance(grow.get("strains"), list):
         legacy = grow.get("strain", "")
         if legacy:
-            grow["strains"] = [{"name": legacy, "start_date": grow_start, "days_to_finish": None, "actual_harvest_date": None, "strain_type": grow.get("strain_type", "Hybrid"), "plant_type": grow.get("plant_type", "Photo")}]
+            grow["strains"] = [
+                {
+                    "name": legacy,
+                    "start_date": grow_start,
+                    "days_to_finish": None,
+                    "actual_harvest_date": None,
+                    "strain_type": grow.get("strain_type", "Hybrid"),
+                    "plant_type": grow.get("plant_type", "Photo"),
+                }
+            ]
         else:
             grow["strains"] = []
     for s in grow["strains"]:
         _normalize_strain(s, grow_start)
     if "harvest_date" in grow:
         del grow["harvest_date"]
+
+    # Normalize entries (feeding schema, etc.)
+    entries = grow.get("entries")
+    if isinstance(entries, list):
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("type") == "feeding":
+                _normalize_feeding_entry(entry)
     return grow
 
 
@@ -130,6 +236,51 @@ def export_grows_to_csv_rows():
         is_primary = grow.get("is_primary", False)
         notes = grow.get("notes", "")
         for entry in grow.get("entries", []):
+            # Feeding entries may use the new nutrients[] schema; derive summary fields.
+            nutrients = entry.get("nutrients") if isinstance(entry.get("nutrients"), list) else None
+            nutrient_amount = entry.get("nutrient_amount", "")
+            nutrient_unit = entry.get("nutrient_unit", "")
+            strength_percent = entry.get("strength_percent", "")
+            nutrients_summary = ""
+            if nutrients:
+                parts = []
+                for n in nutrients:
+                    if not isinstance(n, dict):
+                        continue
+                    name = n.get("name") or ""
+                    amount = n.get("amount")
+                    unit = n.get("unit") or ""
+                    sp = n.get("strength_percent")
+                    try:
+                        amount_str = "" if amount is None else str(amount)
+                    except Exception:
+                        amount_str = ""
+                    try:
+                        sp_str = "" if sp is None else str(int(sp))
+                    except Exception:
+                        sp_str = ""
+                    label = name or "Nutrient"
+                    details = []
+                    if amount_str and unit:
+                        details.append(f"{amount_str} {unit}")
+                    if sp_str:
+                        details.append(f"@ {sp_str}%")
+                    fragment = label
+                    if details:
+                        fragment = f"{fragment}: " + " ".join(details)
+                    parts.append(fragment)
+                nutrients_summary = "; ".join(p for p in parts if p)
+
+                # For backward-compatible scalar fields, take the first nutrient if present.
+                first = next((n for n in nutrients if isinstance(n, dict)), None)
+                if first is not None:
+                    if first.get("amount") is not None:
+                        nutrient_amount = first.get("amount")
+                    if first.get("unit"):
+                        nutrient_unit = first.get("unit")
+                    if first.get("strength_percent") is not None:
+                        strength_percent = first.get("strength_percent")
+
             row = {
                 "grow_id": grow_id,
                 "start_date": start_date,
@@ -143,9 +294,10 @@ def export_grows_to_csv_rows():
                 "pump_duration": entry.get("pump_duration", ""),
                 "ph_value": entry.get("ph_value", ""),
                 "is_manual": entry.get("is_manual", ""),
-                "nutrient_amount": entry.get("nutrient_amount", ""),
-                "nutrient_unit": entry.get("nutrient_unit", ""),
-                "strength_percent": entry.get("strength_percent", ""),
+                "nutrient_amount": nutrient_amount,
+                "nutrient_unit": nutrient_unit,
+                "strength_percent": strength_percent,
+                "nutrients": nutrients_summary,
                 "volume": entry.get("volume", ""),
                 "volume_unit": entry.get("volume_unit", ""),
                 "note_text": entry.get("note_text", ""),
