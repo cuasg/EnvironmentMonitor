@@ -209,21 +209,21 @@ const ControlPanel = () => {
     if (pumpRunning) return;
     runWithPinAlways(async (token) => {
       const duration = settings.pump_duration;
-      setPumpRunning(true);
-      setCountdown(duration);
-      let remainingTime = duration;
-      const timer = setInterval(() => {
-        remainingTime -= 1;
-        setCountdown(remainingTime);
-        if (remainingTime <= 0) {
-          clearInterval(timer);
-          setPumpRunning(false);
-        }
-      }, 1000);
       try {
         await apiActivatePump(pumpType, duration, token);
+        // Start countdown only after server has started the pump so timer and pump run in sync
+        setPumpRunning(true);
+        setCountdown(duration);
+        let remainingTime = duration;
+        const timer = setInterval(() => {
+          remainingTime -= 1;
+          setCountdown(remainingTime);
+          if (remainingTime <= 0) {
+            clearInterval(timer);
+            setPumpRunning(false);
+          }
+        }, 1000);
       } catch (error) {
-        clearInterval(timer);
         showToast(error.response?.data?.error || "Error activating pump.", "error");
         setPumpRunning(false);
         setCountdown(0);

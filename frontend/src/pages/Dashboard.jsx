@@ -193,6 +193,8 @@ const Dashboard = () => {
     low_pH: 5.7,
     high_pH: 6.3,
     pump_duration: 5,
+    dev_mode: true,
+    sensors_available: true,
   });
 
   const [phMonitoring, setPhMonitoring] = useState(false);
@@ -222,6 +224,8 @@ const Dashboard = () => {
       try {
         const data = await getSettings();
         if (data) {
+          const dev_mode = data.dev_mode === true;
+          const sensors_available = data.sensors_available !== false;
           setSensorData({
             ph_value: formatNumber(data.pH_value),
             ph_voltage: formatNumber(data.ph_voltage),
@@ -241,6 +245,8 @@ const Dashboard = () => {
             low_pH: formatNumber(data.pump_settings?.low_pH, 1),
             high_pH: formatNumber(data.pump_settings?.high_pH, 1),
             pump_duration: parseInt(data.pump_settings?.pump_duration ?? 5, 10),
+            dev_mode,
+            sensors_available,
           });
           setSettingsForOled(data);
           setPhMonitoring(data.pH_monitoring_enabled);
@@ -308,13 +314,15 @@ const Dashboard = () => {
   const WS_THROTTLE_MS = 2000;
 
   const updateSensorData = useCallback((data) => {
+    const dev_mode = data.dev_mode === true;
+    const sensors_available = data.sensors_available !== false;
     const phVal = formatNumber(data.pH_value);
     const ppm = formatNumber(data.ppm_500);
     const hum = formatNumber(data.humidity);
     const air = formatNumber(data.air_temperature_f);
     const water = formatNumber(data.water_temperature_f);
     const lightVolt = formatNumber(data.light_sensor?.analog_voltage);
-    const signature = [phVal, ppm, hum, air, water, lightVolt, data.last_pump_activation?.timestamp].join("|");
+    const signature = [phVal, ppm, hum, air, water, lightVolt, data.last_pump_activation?.timestamp, dev_mode, sensors_available].join("|");
     if (signature === lastSensorSignatureRef.current) return;
     lastSensorSignatureRef.current = signature;
 
@@ -339,6 +347,8 @@ const Dashboard = () => {
       high_pH: formatNumber(data.pump_settings?.high_pH, 1),
       pump_duration: data.pump_settings?.pump_duration != null
         ? parseInt(data.pump_settings.pump_duration, 10) : prev.pump_duration,
+      dev_mode,
+      sensors_available,
     }));
 
     const now = Date.now();
@@ -392,21 +402,21 @@ const Dashboard = () => {
     if (pumpRunning) return;
     const duration = typeof sensorData.pump_duration === "number" ? sensorData.pump_duration : 5;
     runWithPinAlways(async (token) => {
-      setPumpRunning(true);
-      setPumpCountdown(duration);
-      let remaining = duration;
-      const timer = setInterval(() => {
-        remaining -= 1;
-        setPumpCountdown(remaining);
-        if (remaining <= 0) {
-          clearInterval(timer);
-          setPumpRunning(false);
-        }
-      }, 1000);
       try {
         await apiActivatePump(pumpType, duration, token);
+        // Start countdown only after server has started the pump so timer and pump run in sync
+        setPumpRunning(true);
+        setPumpCountdown(duration);
+        let remaining = duration;
+        const timer = setInterval(() => {
+          remaining -= 1;
+          setPumpCountdown(remaining);
+          if (remaining <= 0) {
+            clearInterval(timer);
+            setPumpRunning(false);
+          }
+        }, 1000);
       } catch (error) {
-        clearInterval(timer);
         showToast(error.response?.data?.error || "Error activating pump.", "error");
         setPumpRunning(false);
         setPumpCountdown(0);
@@ -481,8 +491,8 @@ const Dashboard = () => {
                 {item.id === "ph" && (
                   <>
                     <h3>pH Sensor</h3>
-                    <p>Voltage: {sensorData.ph_voltage}V</p>
-                    <p>pH: {sensorData.ph_value}</p>
+                    <p>Voltage: {!sensorData.dev_mode && !sensorData.sensors_available ? "N/A" : `${sensorData.ph_voltage}V`}</p>
+                    <p>pH: {!sensorData.dev_mode && !sensorData.sensors_available ? "N/A" : sensorData.ph_value}</p>
                     <p>Range: {sensorData.low_pH} - {sensorData.high_pH}</p>
                     <div className="ph-controls">
                       <label>Auto pH:</label>
@@ -561,23 +571,35 @@ const Dashboard = () => {
                 {item.id === "light" && (
                   <>
                     <h3>Light Sensor</h3>
-                    <LightGauge level={sensorData.light_status.label} />
-                    <p className="light-sensor">
-                      <span className={`light-intensity ${sensorData.light_status.label.toLowerCase()}`}>
-                        {sensorData.light_status.label}
-                      </span>
-                    </p>
-                    <p>Voltage: {sensorData.light_voltage}V</p>
+                    {!sensorData.dev_mode && !sensorData.sensors_available ? (
+                      <p className="sensor-offline">Sensors offline</p>
+                    ) : (
+                      <>
+                        <LightGauge level={sensorData.light_status.label} />
+                        <p className="light-sensor">
+                          <span className={`light-intensity ${sensorData.light_status.label.toLowerCase()}`}>
+                            {sensorData.light_status.label}
+                          </span>
+                        </p>
+                        <p>Voltage: {sensorData.light_voltage}V</p>
+                      </>
+                    )}
                   </>
                 )}
 
                 {item.id === "env" && (
                   <>
                     <h3>Environment</h3>
-                    <p>PPM (500): {sensorData.ppm_500}</p>
-                    <p>Humidity: {sensorData.humidity}%</p>
-                    <p>Air Temp: {sensorData.air_temp}°F</p>
-                    <p>Water Temp: {sensorData.water_temp}°F</p>
+                    {!sensorData.dev_mode && !sensorData.sensors_available ? (
+                      <p className="sensor-offline">Sensors offline — no live data</p>
+                    ) : (
+                      <>
+                        <p>PPM (500): {sensorData.ppm_500}</p>
+                        <p>Humidity: {sensorData.humidity}%</p>
+                        <p>Air Temp: {sensorData.air_temp}°F</p>
+                        <p>Water Temp: {sensorData.water_temp}°F</p>
+                      </>
+                    )}
                   </>
                 )}
 

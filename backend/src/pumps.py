@@ -25,23 +25,76 @@ def _ensure_gpio():
     _gpio_initialized = True
 
 
+async def _pump_off_after(pump_number: int, duration: int, ph_value: float = None, is_manual: bool = False):
+    """Background: sleep for duration, turn pump off, save settings and log. Used after pump is already ON."""
+    import RPi.GPIO as GPIO
+    pump_pin = PUMP_UP_PIN if pump_number == 1 else PUMP_DOWN_PIN
+    pump_label = "up" if pump_number == 1 else "down"
+    timestamp_cst = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        await asyncio.sleep(duration)
+        GPIO.output(pump_pin, GPIO.LOW)
+        off_time = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
+        print(f"✅ Pump {pump_number} ({pump_label}) deactivated at {off_time} CST.")
+        settings = load_settings()
+        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_cst}
+        await save_settings(settings)
+        if ph_value:
+            log_pump_activation(pump_label, timestamp_cst, ph_value, is_manual=is_manual, duration_seconds=duration)
+        print(f"✅ Pump Activation Logged: {pump_label.capitalize()} pump ran at {timestamp_cst} CST.")
+    except Exception as e:
+        print(f"❌ Error in pump off/save: {e}")
+
+
+def start_pump_then_return(pump_number: int, duration: int, ph_value: float = None, is_manual: bool = False):
+    """Turns the pump ON immediately, schedules turn-off after duration, and returns so the API can respond.
+    The UI can start its countdown when it receives the response, in sync with the actual pump run."""
+    if pump_number not in [1, 2]:
+        print("❌ Error: Invalid pump number! Must be 1 (pH Up) or 2 (pH Down).")
+        return False
+    settings = load_settings()
+    if ph_value is None:
+        ph_value = settings.get("pH_value")
+    pump_label = "up" if pump_number == 1 else "down"
+    timestamp_cst = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
+
+    if settings.get("dev_mode", False):
+        print(f"🔧 Pump {pump_number} ({pump_label}) activation (dev mode, simulated) for {duration}s at {timestamp_cst} CST...")
+        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_cst}
+        asyncio.get_running_loop().create_task(_save_dev_pump_and_log(pump_label, timestamp_cst, ph_value, is_manual, duration))
+        print(f"✅ Pump activation logged (simulated).")
+        return True
+
+    _ensure_gpio()
+    import RPi.GPIO as GPIO
+    pump_pin = PUMP_UP_PIN if pump_number == 1 else PUMP_DOWN_PIN
+    print(f"⚡ Activating Pump {pump_number} ({pump_label}) for {duration} seconds at {timestamp_cst} CST...")
+    try:
+        GPIO.output(pump_pin, GPIO.HIGH)
+        asyncio.get_running_loop().create_task(_pump_off_after(pump_number, duration, ph_value, is_manual))
+        return True
+    except Exception as e:
+        print(f"❌ Error activating pump {pump_number}: {e}")
+        return False
+
+
+async def _save_dev_pump_and_log(pump_label: str, timestamp_cst: str, ph_value, is_manual: bool, duration: int):
+    """Dev mode: save last_pump_activation and log (async, so API can return immediately)."""
+    settings = load_settings()
+    settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_cst}
+    await save_settings(settings)
+    if ph_value:
+        log_pump_activation(pump_label, timestamp_cst, ph_value, is_manual=is_manual, duration_seconds=duration)
+
+
 async def activate_pump(pump_number: int, duration: int, ph_value: float = None, is_manual: bool = False):
     """Activates the specified pump (1 = pH Up, 2 = pH Down) for a set duration and logs the event in CST.
-    
-    Args:
-        pump_number: 1 for pH Up, 2 for pH Down
-        duration: Duration in seconds
-        ph_value: Optional pH value to log (if not provided, will try to get from settings)
-        is_manual: Whether this is a manual activation (default: False)
-    """
-
+    Used by main.py pH loop; for manual API use start_pump_then_return so the API can respond immediately."""
     if pump_number not in [1, 2]:
         print("❌ Error: Invalid pump number! Must be 1 (pH Up) or 2 (pH Down).")
         return False
 
     settings = load_settings()
-    
-    # Get pH value if not provided
     if ph_value is None:
         ph_value = settings.get("pH_value")
 
@@ -54,43 +107,29 @@ async def activate_pump(pump_number: int, duration: int, ph_value: float = None,
             "timestamp": timestamp_cst
         }
         await save_settings(settings)
-        
-        # Log to grow log if primary grow exists
         if ph_value:
             log_pump_activation(pump_label, timestamp_cst, ph_value, is_manual=is_manual, duration_seconds=duration)
-        
         print(f"✅ Pump activation logged (simulated).")
         return True
 
     _ensure_gpio()
     import RPi.GPIO as GPIO
-
     pump_pin = PUMP_UP_PIN if pump_number == 1 else PUMP_DOWN_PIN
     pump_label = "up" if pump_number == 1 else "down"
     timestamp_cst = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
-
     print(f"⚡ Activating Pump {pump_number} ({pump_label}) for {duration} seconds at {timestamp_cst} CST...")
-
     try:
         GPIO.output(pump_pin, GPIO.HIGH)
         await asyncio.sleep(duration)
         GPIO.output(pump_pin, GPIO.LOW)
-
         print(f"✅ Pump {pump_number} ({pump_label}) deactivated at {timestamp_cst} CST.")
-
-        settings["last_pump_activation"] = {
-            "pump": pump_label,
-            "timestamp": timestamp_cst
-        }
+        settings = load_settings()
+        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_cst}
         await save_settings(settings)
-        
-        # Log to grow log if primary grow exists
         if ph_value:
             log_pump_activation(pump_label, timestamp_cst, ph_value, is_manual=is_manual, duration_seconds=duration)
-        
         print(f"✅ Pump Activation Logged: {pump_label.capitalize()} pump ran at {timestamp_cst} CST.")
         return True
-
     except Exception as e:
         print(f"❌ Error activating pump {pump_number}: {e}")
         return False

@@ -235,6 +235,8 @@ def get_default_settings():
         "next_ph_check": None,
         "influx_config": {},
         "last_pump_activation": {"pump": None, "timestamp": None},
+        "sensors_available": True,
+        "sensors_unavailable_reason": None,
         "ph_voltage": None,
         "pH_value": None,
         "tds_voltage": None,

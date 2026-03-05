@@ -157,11 +157,28 @@ async def average_ph_readings():
 
 
 async def read_all_sensors():
+    """When dev_mode is True: use simulated values. When dev_mode is False and hardware unavailable: do not write fake data; mark sensors offline."""
     settings = load_settings()
-    if settings.get("dev_mode", False) or not _hardware_available():
+    dev_mode = settings.get("dev_mode", False)
+    hw_available = _hardware_available()
+
+    if dev_mode:
         return await _read_all_sensors_simulated()
+
+    if not hw_available:
+        await save_settings({"sensors_available": False, "sensors_unavailable_reason": "Hardware modules not available (install Pi dependencies)."})
+        return None
+
     import sensors_hardware
-    return await sensors_hardware.read_all_sensors()
+    try:
+        data = await sensors_hardware.read_all_sensors()
+        if data is not None:
+            await save_settings({"sensors_available": True, "sensors_unavailable_reason": None})
+        return data
+    except Exception as e:
+        print(f"❌ Sensor read failed: {e}")
+        await save_settings({"sensors_available": False, "sensors_unavailable_reason": str(e)})
+        return None
 
 
 async def _read_all_sensors_simulated():
@@ -180,6 +197,7 @@ async def _read_all_sensors_simulated():
         light_data = _simulate_light()
 
         updated_sensor_data = {
+            "sensors_available": True,
             "ph_voltage": ph_voltage,
             "pH_value": pH_value,
             "tds_voltage": tds_voltage,

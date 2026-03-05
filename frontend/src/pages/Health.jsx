@@ -55,7 +55,11 @@ const Health = () => {
     if (typeof value !== "object" || value === null) return null;
     const err = value.error || value.details;
     if (err) return err;
-    if (key === "sensors_recent" && value.last_ph_check) return `Last pH check: ${value.last_ph_check}`;
+    if (key === "sensors_recent") {
+      if (value.ok === false && (value.sensors_unavailable_reason || value.details))
+        return value.sensors_unavailable_reason || value.details;
+      if (value.last_ph_check) return `Last pH check: ${value.last_ph_check}`;
+    }
     return null;
   };
 

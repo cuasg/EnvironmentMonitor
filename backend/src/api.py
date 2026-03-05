@@ -7,7 +7,7 @@ import subprocess
 from quart import Quart, websocket, request, jsonify
 from quart_cors import cors
 from settings import load_settings, save_settings
-from pumps import activate_pump
+from pumps import activate_pump, start_pump_then_return
 from main import main  # ✅ Import the continuous monitoring loop
 from oled_display import async_display_oled  # ✅ Import OLED function
 from database import query_trends, TRENDS_AVAILABLE_FIELDS, check_influx_connection, get_influx_connection_status
@@ -280,28 +280,39 @@ async def get_health():
     except Exception as e:
         result["influx"] = {"ok": False, "error": str(e)}
 
-    # Sensors recent (last_ph_check present and not too old)
-    result["sensors_recent"] = {"ok": True, "last_ph_check": None, "details": None}
+    # Sensors: dev_mode, sensors_available, last_ph_check; red when offline or stale
+    result["sensors_recent"] = {"ok": True, "last_ph_check": None, "details": None, "dev_mode": False, "sensors_available": True, "sensors_unavailable_reason": None}
     try:
         settings = load_settings()
-        last_ph = settings.get("last_ph_check")
-        result["sensors_recent"]["last_ph_check"] = last_ph
-        if not last_ph or last_ph == "N/A":
+        dev_mode = settings.get("dev_mode", False)
+        sensors_available = settings.get("sensors_available", True)
+        reason = settings.get("sensors_unavailable_reason")
+        result["sensors_recent"]["dev_mode"] = dev_mode
+        result["sensors_recent"]["sensors_available"] = sensors_available
+        result["sensors_recent"]["sensors_unavailable_reason"] = reason
+
+        if not dev_mode and not sensors_available:
             result["sensors_recent"]["ok"] = False
-            result["sensors_recent"]["details"] = "No recent pH check recorded"
+            result["sensors_recent"]["details"] = reason or "Sensors offline: hardware not available"
+            result["sensors_recent"]["last_ph_check"] = settings.get("last_ph_check")
         else:
-            try:
-                # Parse "2026-02-19 1:00 PM" or similar
-                dt = datetime.strptime(last_ph, "%Y-%m-%d %I:%M %p")
-                interval_sec = (settings.get("sensor_intervals") or {}).get("ph_check_interval", 60)
-                max_age_sec = max(2 * interval_sec, 15 * 60)  # at least 15 min
-                if (datetime.now() - dt).total_seconds() > max_age_sec:
-                    result["sensors_recent"]["ok"] = False
-                    result["sensors_recent"]["details"] = "Last pH check is older than expected"
-            except (ValueError, TypeError):
-                pass  # keep ok True if we can't parse
+            last_ph = settings.get("last_ph_check")
+            result["sensors_recent"]["last_ph_check"] = last_ph
+            if not last_ph or last_ph == "N/A":
+                result["sensors_recent"]["ok"] = False
+                result["sensors_recent"]["details"] = "No recent pH check recorded"
+            else:
+                try:
+                    dt = datetime.strptime(last_ph, "%Y-%m-%d %I:%M %p")
+                    interval_sec = (settings.get("sensor_intervals") or {}).get("ph_check_interval", 60)
+                    max_age_sec = max(2 * interval_sec, 15 * 60)
+                    if (datetime.now() - dt).total_seconds() > max_age_sec:
+                        result["sensors_recent"]["ok"] = False
+                        result["sensors_recent"]["details"] = "Last pH check is older than expected"
+                except (ValueError, TypeError):
+                    pass
     except Exception as e:
-        result["sensors_recent"] = {"ok": False, "last_ph_check": None, "details": str(e)}
+        result["sensors_recent"] = {"ok": False, "last_ph_check": None, "details": str(e), "dev_mode": False, "sensors_available": False, "sensors_unavailable_reason": None}
 
     # Settings file
     try:
@@ -635,11 +646,11 @@ async def api_activate_pump():
         settings = load_settings()
         ph_value = settings.get("pH_value")
         
-        # ✅ Activate pump asynchronously (mark as manual since this is the API endpoint)
-        success = await activate_pump(pump_number, duration, ph_value=ph_value, is_manual=True)
+        # ✅ Turn pump ON immediately, then return so the client can start its countdown in sync with the pump
+        success = start_pump_then_return(pump_number, duration, ph_value=ph_value, is_manual=True)
 
         if success:
-            return jsonify({"message": f"Pump {pump_number} activated successfully for {duration} seconds!"})
+            return jsonify({"message": "Pump started", "duration": duration}), 202
         else:
             return jsonify({"error": "Pump activation failed."}), 500
 
