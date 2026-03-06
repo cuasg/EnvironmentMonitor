@@ -1,17 +1,18 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import InfluxStatusPopup from "./components/InfluxStatusPopup";
 import PinSetup from "./components/PinSetup";
 import PinModal from "./components/PinModal";
 import Toast from "./components/Toast";
-import Dashboard from "./pages/Dashboard";
-import Trends from "./pages/Trends";
-import NutrientCalculator from "./pages/NutrientCalculator";
-import GrowLog from "./pages/GrowLog";
-import ControlPanel from "./pages/ControlPanel";
-import Health from "./pages/Health";
 import { useAuth } from "./context/AuthContext";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Trends = lazy(() => import("./pages/Trends"));
+const NutrientCalculator = lazy(() => import("./pages/NutrientCalculator"));
+const GrowLog = lazy(() => import("./pages/GrowLog"));
+const ControlPanel = lazy(() => import("./pages/ControlPanel"));
+const Health = lazy(() => import("./pages/Health"));
 
 const KioskWrapper = ({ children }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -68,6 +69,7 @@ const App = () => {
       <Toast />
       {!isKiosk && <Navbar />}
       <main id="main-content" className="app-main" tabIndex={-1}>
+        <Suspense fallback={<div className="app-loading"><div className="app-loading-spinner" aria-hidden /><span className="app-loading-text">Loading…</span></div>}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/trends" element={<Trends />} />
@@ -79,6 +81,7 @@ const App = () => {
           <Route path="/kiosk/dashboard" element={<KioskWrapper><Dashboard /></KioskWrapper>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </main>
     </div>
   );

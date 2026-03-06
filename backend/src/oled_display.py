@@ -7,47 +7,26 @@ async def async_display_oled():
     """Asynchronous OLED update loop using configurable pages from settings."""
     settings = load_settings()
     oled = None
-    
-    if settings.get("dev_mode", False):
-        print("🖥️ OLED: dev_mode ON, display loop running (no hardware).")
-    else:
-        # Lazy init: only import and init hardware when dev_mode is False (e.g. on Pi)
+    if not settings.get("dev_mode", False):
         try:
             import board
             import busio
             import adafruit_ssd1306
             i2c = busio.I2C(board.SCL, board.SDA)
             oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
-        except Exception as e:
-            print(f"⚠ OLED hardware init failed: {e}")
+        except Exception:
             oled = None
-
     current_page_index = 0
-    
-    # Initial render to set display state immediately
-    print("🖥️ OLED: Performing initial render...")
     settings = load_settings()
     oled_config = settings.get("oled_config", {})
     pages = oled_config.get("pages", [])
     enabled_pages = [p for p in pages if p.get("enabled", True)]
-    
     if not enabled_pages:
-        print("⚠️ OLED: No enabled pages found in config, using defaults from get_default_settings()")
-        # Use defaults from get_default_settings()
         default_settings = get_default_settings()
-        default_oled_config = default_settings.get("oled_config", {})
-        default_pages = default_oled_config.get("pages", [])
+        default_pages = default_settings.get("oled_config", {}).get("pages", [])
         enabled_pages = [p for p in default_pages if p.get("enabled", True)]
-        
-        if enabled_pages:
-            print(f"🖥️ OLED: Using {len(enabled_pages)} default pages")
-            await render_oled_page(enabled_pages[0], settings, oled)
-        else:
-            print("❌ OLED: No default pages available!")
-    else:
-        print(f"🖥️ OLED: Rendering initial page: {enabled_pages[0].get('id', 'unknown')}")
+    if enabled_pages:
         await render_oled_page(enabled_pages[0], settings, oled)
-
     while True:
         settings = load_settings()
         oled_config = settings.get("oled_config", {})

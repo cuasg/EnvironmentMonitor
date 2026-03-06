@@ -7,6 +7,7 @@ from datetime import datetime
 from settings import _SETTINGS_DIR
 
 GROW_LOGS_FILE = os.path.join(_SETTINGS_DIR, "grow_logs.json")
+_grow_logs_cache = None
 
 
 def _normalize_strain(s, grow_start_date):
@@ -151,10 +152,12 @@ def _normalize_grow(grow):
 
 
 def load_grow_logs():
-    """Load grow logs from JSON file. Normalizes each grow to have strains list and harvest_date."""
+    """Load grow logs from JSON file. Uses in-memory cache for Pi Zero efficiency."""
+    global _grow_logs_cache
+    if _grow_logs_cache is not None:
+        return _grow_logs_cache
     if not os.path.exists(GROW_LOGS_FILE):
         return {"grows": []}
-    
     try:
         with open(GROW_LOGS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -162,20 +165,21 @@ def load_grow_logs():
                 return {"grows": []}
             for grow in data.get("grows", []):
                 _normalize_grow(grow)
+            _grow_logs_cache = data
             return data
-    except Exception as e:
-        print(f"⚠️ Error loading grow logs: {e}")
+    except Exception:
         return {"grows": []}
 
 
 def save_grow_logs(data):
     """Save grow logs to JSON file."""
+    global _grow_logs_cache
     try:
         with open(GROW_LOGS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+        _grow_logs_cache = data
         return True
-    except Exception as e:
-        print(f"❌ Error saving grow logs: {e}")
+    except Exception:
         return False
 
 
@@ -307,14 +311,11 @@ def export_grows_to_csv_rows():
 
 
 def log_pump_activation(pump_label, timestamp, ph_value, is_manual=False, duration_seconds=None):
-    """Log a pump activation to the primary grow's log.
-    duration_seconds: how long the pump ran (seconds), if known.
-    """
-    primary_grow = get_primary_grow()
+    """Log a pump activation to the primary grow's log."""
+    logs = load_grow_logs()
+    primary_grow = next((g for g in logs.get("grows", []) if g.get("is_primary")), None)
     if not primary_grow:
         return False
-    
-    logs = load_grow_logs()
     for grow in logs.get("grows", []):
         if grow.get("id") == primary_grow.get("id"):
             if "entries" not in grow:

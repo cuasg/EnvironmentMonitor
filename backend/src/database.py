@@ -84,16 +84,14 @@ def check_influx_connection():
     url, token, org, bucket = _get_influx_config()
 
     if not influx_configured():
-        error_msg = f"InfluxDB not configured: set URL and token in Control Panel or .env"
+        error_msg = "InfluxDB not configured: set URL and token in Control Panel or .env"
         _influx_connection_status = {"connected": False, "error": error_msg}
-        print(f"⚠️ {error_msg}")
         return False, error_msg
 
     _ensure_client()
     if not client:
         error_msg = "InfluxDB client not initialized"
         _influx_connection_status = {"connected": False, "error": error_msg}
-        print(f"⚠️ {error_msg}")
         return False, error_msg
 
     try:
@@ -121,16 +119,13 @@ def check_influx_connection():
         if bucket_names and bucket not in bucket_names:
             error_msg = f"Bucket '{bucket}' not found in org '{org}'. Available: {', '.join(bucket_names)}"
             _influx_connection_status = {"connected": False, "error": error_msg}
-            print(f"⚠️ {error_msg}")
             return False, error_msg
 
         _influx_connection_status = {"connected": True, "error": None}
-        print(f"✅ InfluxDB connection verified: {url}, org={org}, bucket={bucket}")
         return True, None
     except Exception as e:
         error_msg = f"Connection failed: {str(e)}"
         _influx_connection_status = {"connected": False, "error": error_msg}
-        print(f"❌ InfluxDB connection check failed: {error_msg}")
         return False, error_msg
 
 
@@ -153,7 +148,7 @@ def enforce_type(value, field_name, value_type):
         elif value_type == "int":
             return int(value)
     except (ValueError, TypeError):
-        print(f"⚠ WARNING: Invalid {value_type} value for {field_name}: {value}. Using default.")
+        logging.debug("Invalid %s value for %s: %s", value_type, field_name, value)
         return 0 if value_type == "int" else 0.0
     return 0.0 if value_type == "float" else 0
 
@@ -164,8 +159,7 @@ def convert_to_iso(timestamp, field_name):
         try:
             return datetime.datetime.strptime(timestamp, "%Y-%m-%d %I:%M %p").strftime("%Y-%m-%dT%H:%M:%S")
         except ValueError:
-            print(f"⚠ WARNING: Invalid timestamp format for {field_name}: {timestamp}")
-            return None  # Skip invalid timestamps
+            return None
     return timestamp  # Return unchanged if already in datetime format
 
 
@@ -180,24 +174,18 @@ async def write_to_influxdb(point):
     _, _, org, bucket = _get_influx_config()
     try:
         await asyncio.to_thread(write_api.write, bucket=bucket, org=org, record=point)
-        print(f"✅ Successfully logged to InfluxDB: {point}")
     except Exception as e:
         logging.error("InfluxDB write error: %s", e)
-        print(f"❌ ERROR writing to InfluxDB: {e}")
 
 
 async def log_sensor_data():
-    """Fetches sensor data from settings.json and logs it to InfluxDB every time.
+    """Fetches sensor data from settings.json and logs it to InfluxDB.
     Skips writing when dev_mode is True (fake/simulated readings)."""
     try:
-        print("🔄 Loading settings...")
         settings = load_settings()
-
         if settings.get("dev_mode", False):
-            print("⏭ Dev mode ON: skipping InfluxDB write (no fake data written).")
             return
         if not influx_configured():
-            print("⏭ InfluxDB not configured; skipping write.")
             return
 
         # ✅ Extract and Validate Sensor Data (Ensuring Type Consistency)
@@ -217,10 +205,8 @@ async def log_sensor_data():
             "last_pump_activated": settings.get("last_pump_activation", {}).get("pump"),
         }
 
-        # Skip write if pH is missing or invalid (live sensors must report valid pH for trends)
         ph_val = sensor_data["pH_value"]
         if ph_val is None or not (1.0 <= ph_val <= 14.0):
-            print("⚠ pH_value missing or out of range (1-14); skipping Influx write.")
             return
 
         # Safe string fields for line protocol (avoid literal None)
@@ -257,13 +243,10 @@ async def log_sensor_data():
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, params=params, data=line_protocol_data) as response:
-                if response.status == 204:
-                    print(f"✅ Data written to InfluxDB successfully!")
-                else:
-                    print(f"❌ Failed to write data to InfluxDB: {response.status}, {await response.text()}")
-
+                if response.status != 204:
+                    logging.error("InfluxDB write failed: %s %s", response.status, await response.text())
     except Exception as e:
-        print(f"❌ ERROR logging sensor data to InfluxDB: {e}")
+        logging.error("Error logging sensor data: %s", e)
 
 
 # All numeric sensor fields that can be plotted (exclude string/timestamp fields)
@@ -326,6 +309,5 @@ def query_trends(range_minutes, fields):
         result = sorted(by_time.values(), key=lambda x: x["time"])
         return result
     except Exception as e:
-        logging.error(f"Trends query error: {e}")
-        print(f"❌ ERROR querying trends: {e}")
+        logging.error("Trends query error: %s", e)
         return []

@@ -1,10 +1,14 @@
 import asyncio
+import logging
 import time
 from datetime import datetime
 import pytz
 from settings import load_settings, save_settings
-from sensors import read_all_sensors, average_ph_readings
+
+logger = logging.getLogger(__name__)
+from sensors import read_all_sensors, read_ph_sensor
 from pumps import activate_pump
+from ph_buffer import add_reading, get_average
 from database import log_sensor_data
 from datetime import datetime, timedelta
 
@@ -25,7 +29,9 @@ async def continuous_monitoring():
 
         updated_sensor_data = await read_all_sensors()
         if updated_sensor_data is None:
-            print("⚠ Sensor read failed; keeping previous values. Retrying next interval.")
+            logger.debug("Sensor read failed; retrying next interval")
+        elif updated_sensor_data.get("pH_value") is not None:
+            add_reading(updated_sensor_data["pH_value"])
 
         current_time = time.time()
         if current_time - last_db_update >= sensor_update_interval:
@@ -42,31 +48,29 @@ async def continuous_monitoring():
 
 async def ph_monitoring():
     """Continuously monitors pH and activates pumps if needed."""
-    print("🛠️ pH Monitoring Started...")
-
     while True:
         settings = load_settings()
         if not settings.get("pH_monitoring_enabled", False):
-            print("⏸️ pH Monitoring Paused. Waiting for activation...")
             await asyncio.sleep(5)
             continue
 
         sensor_intervals = settings.get("sensor_intervals") or {}
         ph_check_interval = sensor_intervals.get("ph_check_interval", 60)
+        ph_window_minutes = sensor_intervals.get("ph_average_window_minutes", 5)
         low_pH = settings["pump_settings"].get("low_pH", 5.7)
         high_pH = settings["pump_settings"].get("high_pH", 6.3)
         pump_duration = settings["pump_settings"].get("pump_duration", 5)
         stabilization_time = settings["pump_settings"].get("stabilization_time", 30)
 
-        print("📏 Running pH averaging function...")
-        avg_ph_voltage, avg_ph_value = await average_ph_readings()
+        avg_ph_value = get_average(minutes=ph_window_minutes, min_readings=6)
+        if avg_ph_value is None:
+            avg_ph_voltage, avg_ph_value = await read_ph_sensor()
+        else:
+            avg_ph_voltage = settings.get("ph_voltage")  # Latest from continuous loop
 
         if avg_ph_value is None:
-            print("⚠ ERROR: Invalid pH value detected. Retrying in 10 seconds...")
             await asyncio.sleep(10)
             continue
-
-        print(f"📊 Average pH: {avg_ph_value} | Voltage: {avg_ph_voltage}")
 
         # ✅ Get current timestamp
         now_cst = datetime.now(CST)
@@ -74,33 +78,24 @@ async def ph_monitoring():
 
         # ✅ Determine next check time & required sleep duration
         if avg_ph_value < low_pH:
-            print(f"⚠ pH too LOW ({avg_ph_value})! Activating pH UP pump...")
             await activate_pump(1, pump_duration, ph_value=avg_ph_value)
             sleep_time = stabilization_time
         elif avg_ph_value > high_pH:
-            print(f"⚠ pH too HIGH ({avg_ph_value})! Activating pH DOWN pump...")
             await activate_pump(2, pump_duration, ph_value=avg_ph_value)
             sleep_time = stabilization_time
         else:
-            print(f"✅ pH is within range ({low_pH} - {high_pH}). No action needed.")
             sleep_time = ph_check_interval
 
         next_check_time = now_cst + timedelta(seconds=sleep_time)
         next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
 
-        print(f"🔍 DEBUG: [ph_monitoring] BEFORE SAVE last_ph_check = {now_cst_str}, next_ph_check = {next_check_time_str}")
-
-        # ✅ Ensure timestamps persist correctly
+        # Ensure timestamps persist correctly
         existing_settings = load_settings()
         existing_settings["last_ph_check"] = now_cst_str
         existing_settings["next_ph_check"] = next_check_time_str
 
         # ✅ Save updated timestamps
         await save_settings(existing_settings)
-
-        print(f"📅 Last pH Check: {now_cst_str} | Next pH Check: {next_check_time_str}")
-        print(f"⏳ Waiting for {sleep_time} seconds before next check...")
-
         await asyncio.sleep(sleep_time)
 
 

@@ -1,14 +1,13 @@
 """
 Sensor facade: dev_mode uses simulated values; otherwise delegates to sensors_hardware.
 No hardware imports at top level so the app can start on Windows/WSL when dev_mode is True.
-
-When dev_mode is False (live sensors): sensors_hardware.read_all_sensors() merges new reads
-with existing settings so a single failed sensor does not overwrite good cached values.
-pH read has a timeout to avoid hanging if the probe is disconnected.
 """
 import asyncio
+import logging
 import random
 from settings import load_settings, save_settings
+
+logger = logging.getLogger(__name__)
 
 # Simulated value ranges (slight drift each read so UI looks live)
 _SIM_PH_VOLTAGE_BASE = 2.55
@@ -101,7 +100,7 @@ def _hardware_available():
         _hardware_available_cache = True
     except (ModuleNotFoundError, ImportError):
         _hardware_available_cache = False
-        print("Hardware modules not available (e.g. not on Pi), using simulated sensors.")
+        logger.debug("Hardware modules not available; using simulated sensors")
     return _hardware_available_cache
 
 

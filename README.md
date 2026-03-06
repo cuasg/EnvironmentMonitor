@@ -100,6 +100,7 @@ All sensitive and environment-specific values use **environment variables** or a
 | `PLANT_API_HOST` | Bind address (default `0.0.0.0`) | Optional |
 | `PLANT_API_PORT` | API port (default `5000`) | Optional |
 | `PLANT_SETTINGS_DIR` | Directory for `settings.json`, `.env`, `grow_logs.json` | Optional |
+| `PLANT_DEBUG` | Set to `1` for verbose debug logging (default: minimal for Pi Zero) | Optional |
 
 - **Option A:** Put a `.env` file in `backend/src/` (next to `config.py`) or in the directory set by `PLANT_SETTINGS_DIR`. Copy from `backend/.env.example`.
 - **Option B:** Export variables in the shell or in your process manager (e.g. systemd).

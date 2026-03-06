@@ -159,7 +159,7 @@ def read_dht_sensor():
         attempt += 1
         time.sleep(2)
 
-    print("❌ ERROR: Failed to read DHT sensor after multiple attempts!")
+    return None
     return None
 
 
@@ -287,9 +287,9 @@ async def read_all_sensors():
         except Exception as e:
             print(f"⚠ pH read failed: {e}")
 
-        # DHT (air temp, humidity)
+        # DHT (air temp, humidity) - run in thread pool to avoid blocking event loop
         try:
-            dht_data = read_dht_sensor()
+            dht_data = await asyncio.to_thread(read_dht_sensor)
             if dht_data:
                 updated_sensor_data["air_temperature_f"] = dht_data.get("temperature_f")
                 updated_sensor_data["humidity"] = dht_data.get("humidity")

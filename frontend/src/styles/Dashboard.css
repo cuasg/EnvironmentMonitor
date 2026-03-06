@@ -102,17 +102,22 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-sm, 8px);
+  flex-wrap: nowrap;
 }
 
 .ph-controls label {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .toggle-switch {
   width: 44px;
   height: 24px;
+  min-width: 44px;
+  flex-shrink: 0;
+  overflow: hidden;
   background: var(--border);
   border-radius: 12px;
   position: relative;

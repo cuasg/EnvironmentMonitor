@@ -2,6 +2,7 @@ import asyncio
 import csv
 import io
 import json
+import logging
 import os
 import subprocess
 from quart import Quart, websocket, request, jsonify
@@ -26,6 +27,10 @@ from pin_auth import (
 )
 
 app = Quart(__name__)
+logger = logging.getLogger(__name__)
+
+# WebSocket broadcast interval (seconds) - 10s for Pi Zero efficiency
+WS_BROADCAST_INTERVAL = 10
 
 PIN_SESSION_HEADER = "X-PIN-Session"
 
@@ -59,82 +64,80 @@ def serialize_datetime(obj):
         return obj.strftime("%Y-%m-%d %I:%M:%S %p")  # ✅ Converts to 12-hour format with AM/PM
     raise TypeError(f"Type {type(obj)} not serializable")
 
-# ✅ Function to Start Background Services
 async def start_services():
-    print("🔍 Checking InfluxDB connection...")
-    success, error = check_influx_connection()
-    if success:
-        print("✅ InfluxDB connection verified.")
-    else:
-        print(f"⚠️ InfluxDB connection check failed: {error}")
-    
-    print("🚀 Starting Main Monitoring Loop...")
-    asyncio.create_task(main())  # ✅ Runs monitoring in the background
-
-    print("🖥️ Starting OLED Display Loop...")
-    asyncio.create_task(async_display_oled())  # ✅ Runs OLED updates in the background
-
-    print("📡 Starting WebSocket Broadcast...")
-    asyncio.create_task(websocket_broadcast_loop())  # ✅ Push settings updates
+    check_influx_connection()
+    asyncio.create_task(main())
+    asyncio.create_task(async_display_oled())
+    asyncio.create_task(websocket_broadcast_loop())
 
 # ✅ WebSocket Route for Live Settings Updates
 @app.websocket("/ws/settings")
 async def settings_ws():
     """Handles WebSocket connections and keeps them alive."""
     global connected_clients
-    connected_clients.append(websocket)  # ✅ Append WebSocket to list instead of set
-    print(f"🔗 WebSocket Client Connected: {websocket}")
+    connected_clients.append(websocket)
+    logger.debug("WebSocket client connected")
 
     try:
         while True:
             settings = load_settings()
-
-            # ✅ Convert datetime fields to string safely
-            datetime_keys = ["last_ph_check", "next_ph_check"]
-
-            for key in datetime_keys:
+            for key in ("last_ph_check", "next_ph_check"):
                 if key in settings and isinstance(settings[key], datetime):
-                    settings[key] = settings[key].strftime("%Y-%m-%d %I:%M:%S %p")  # ✅ 12-hour format
-
-            # ✅ Handle last_pump_activation dictionary safely
+                    settings[key] = settings[key].strftime("%Y-%m-%d %I:%M:%S %p")
             if "last_pump_activation" in settings and isinstance(settings["last_pump_activation"], dict):
-                if "timestamp" in settings["last_pump_activation"] and isinstance(settings["last_pump_activation"]["timestamp"], datetime):
-                    settings["last_pump_activation"]["timestamp"] = settings["last_pump_activation"]["timestamp"].strftime("%Y-%m-%d %I:%M:%S %p")
-
-            # ✅ Ensure settings are always JSON serializable
+                ts = settings["last_pump_activation"].get("timestamp")
+                if isinstance(ts, datetime):
+                    settings["last_pump_activation"]["timestamp"] = ts.strftime("%Y-%m-%d %I:%M:%S %p")
             json_settings = json.dumps(settings, default=serialize_datetime)
-
-            # ✅ Send updated settings to WebSocket clients
             await websocket.send(json_settings)
-
-            # ✅ Send a keep-alive message to prevent WebSocket disconnections
             await websocket.send(json.dumps({"message": "ping"}))
-
-            await asyncio.sleep(5)  # ✅ Send updates every 5 seconds
-
+            await asyncio.sleep(WS_BROADCAST_INTERVAL)
     except Exception as e:
-        print(f"⚠ WebSocket Error: {e}")
-
+        logger.debug("WebSocket error: %s", e)
     finally:
         if websocket in connected_clients:
-            connected_clients.remove(websocket)  # ✅ Properly remove disconnected clients
-        print("❌ WebSocket Client Disconnected")
+            connected_clients.remove(websocket)
 
-# ✅ Function to Broadcast Updates to WebSocket Clients every 5 seconds
+
+def _prepare_settings_for_ws(settings):
+    """Prepare settings dict for WebSocket (datetime serialization, strip pin_auth)."""
+    for key in ("last_ph_check", "next_ph_check"):
+        if key in settings and isinstance(settings[key], datetime):
+            settings[key] = settings[key].strftime("%Y-%m-%d %I:%M:%S %p")
+    if "last_pump_activation" in settings and isinstance(settings["last_pump_activation"], dict):
+        ts = settings["last_pump_activation"].get("timestamp")
+        if isinstance(ts, datetime):
+            settings["last_pump_activation"]["timestamp"] = ts.strftime("%Y-%m-%d %I:%M:%S %p")
+    return settings
+
+
+async def broadcast_settings_once():
+    """One-time broadcast to all connected clients (e.g. after settings update)."""
+    settings = load_settings()
+    if "pin_auth" in settings:
+        settings = {k: v for k, v in settings.items() if k != "pin_auth"}
+    settings["pinConfigured"] = is_pin_configured()
+    settings = _prepare_settings_for_ws(settings)
+    json_settings = json.dumps(settings, default=serialize_datetime)
+    for client in connected_clients[:]:
+        try:
+            await client.send(json_settings)
+        except Exception:
+            connected_clients.remove(client)
+
+
 async def websocket_broadcast_loop():
+    """Broadcast settings to all WebSocket clients at interval."""
     while True:
         settings = load_settings()
+        settings = _prepare_settings_for_ws(settings)
         json_settings = json.dumps(settings, default=serialize_datetime)
-
-        for client in connected_clients[:]:  # ✅ Iterate over a copy of the list
+        for client in connected_clients[:]:
             try:
                 await client.send(json_settings)
-                print(f"📡 WebSocket Broadcast Sent: {json_settings}")
-            except:
-                print("⚠ Removing Disconnected WebSocket Client")
-                connected_clients.remove(client)  # ✅ Safely remove disconnected clients
-
-        await asyncio.sleep(5)  # ✅ Push updates every 5 seconds
+            except Exception:
+                connected_clients.remove(client)
+        await asyncio.sleep(WS_BROADCAST_INTERVAL)
 
 # ✅ REST API to Fetch Settings (strip pin_auth for security)
 @app.route("/settings", methods=["GET"])
@@ -616,10 +619,7 @@ async def update_settings():
         if err is not None:
             return err[0], err[1]
     await save_settings(data)
-
-    # ✅ Broadcast settings update to WebSocket clients
-    asyncio.create_task(websocket_broadcast_loop())
-
+    asyncio.create_task(broadcast_settings_once())
     return jsonify({"message": "Settings updated successfully!"})
 
 # ✅ REST API for Manual Pump Activation (requires PIN session)
@@ -686,12 +686,12 @@ async def shutdown():
     os.system("sudo shutdown -h now")
     return jsonify({"message": "System shutting down..."})
 
-# ✅ Start API Server and Background Services
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    
-    # ✅ Start monitoring, WebSocket loop, and OLED display
+    logging.basicConfig(
+        level=logging.DEBUG if os.environ.get("PLANT_DEBUG") else logging.WARNING,
+        format="%(levelname)s:%(name)s:%(message)s",
+    )
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     loop.create_task(start_services())
-
-    # ✅ Run Quart API in the same event loop
     loop.run_until_complete(app.run_task(host=API_HOST, port=API_PORT, debug=False))

@@ -37,10 +37,8 @@ def _load_dotenv():
                             value = value.strip().strip('"').strip("'")
                             if key and key not in os.environ:
                                 os.environ[key] = value
-                print(f"✅ Loaded .env from {env_file}")
                 return
             except Exception as e:
-                print(f"⚠️ Failed to load .env from {env_file}: {e}")
                 continue
 
 
@@ -64,11 +62,7 @@ INFLUX_TOKEN = _str("INFLUX_TOKEN")
 INFLUX_ORG = _str("INFLUX_ORG", "HomeSensors")
 INFLUX_BUCKET = _str("INFLUX_BUCKET", "plantMonitor")
 
-# Debug output (only show if not configured to avoid exposing tokens)
-if not INFLUX_TOKEN:
-    print(f"⚠️ INFLUX_TOKEN not set. Check .env file at: {_ENV_FILE}")
-else:
-    print(f"✅ InfluxDB config loaded: URL={INFLUX_URL}, ORG={INFLUX_ORG}, BUCKET={INFLUX_BUCKET}, TOKEN={'***' + INFLUX_TOKEN[-4:] if len(INFLUX_TOKEN) > 4 else '***'}")
+# InfluxDB config loaded from env; no startup print to reduce Pi Zero I/O
 
 
 def influx_configured() -> bool:

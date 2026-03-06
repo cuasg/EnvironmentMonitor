@@ -1,7 +1,10 @@
 import json
 import os
 import asyncio
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 # Use env if set; otherwise same directory as this file (works on Pi and WSL)
 _SETTINGS_DIR = os.environ.get(
@@ -10,6 +13,16 @@ _SETTINGS_DIR = os.environ.get(
 )
 SETTINGS_FILE = os.path.join(_SETTINGS_DIR, "settings.json")
 BACKUP_FILE = os.path.join(_SETTINGS_DIR, "settings_backup.json")
+
+# In-memory cache for Pi Zero efficiency - invalidated on save
+_settings_cache = None
+
+
+def invalidate_settings_cache():
+    """Call when settings are written so next load reads fresh from disk."""
+    global _settings_cache
+    _settings_cache = None
+
 
 # ✅ Ensure timestamps are stored as strings in settings.json
 def ensure_datetime(value):
@@ -22,14 +35,18 @@ def ensure_datetime(value):
 
 
 
-# ✅ Load Settings (No Async)
+# ✅ Load Settings (No Async) - cached for Pi Zero efficiency
 def load_settings():
-    """Load settings from the JSON file, ensuring proper formatting."""
+    """Load settings from the JSON file, ensuring proper formatting. Uses in-memory cache."""
+    global _settings_cache
+    if _settings_cache is not None:
+        return _settings_cache
     if not os.path.exists(SETTINGS_FILE):
-        print("⚠ Settings file missing! Creating default settings.")
+        logger.warning("Settings file missing; creating default settings.")
         settings = get_default_settings()
         with open(SETTINGS_FILE, "w") as file:
-            json.dump(settings, file, indent=4)  # ✅ Ensure file is created!
+            json.dump(settings, file, indent=4)
+        _settings_cache = settings
         return settings
 
     try:
@@ -59,22 +76,24 @@ def load_settings():
 
         # ✅ Ensure oled_config exists with default pages if missing
         if "oled_config" not in settings or not isinstance(settings["oled_config"], dict) or not settings["oled_config"].get("pages"):
-            print("⚠️ OLED config missing or empty, merging defaults...")
+            logger.debug("OLED config missing or empty, merging defaults")
             default_settings = get_default_settings()
             settings["oled_config"] = default_settings.get("oled_config", {})
 
+        _settings_cache = settings
         return settings
 
     except json.JSONDecodeError:
-        print("❌ Error: Corrupt settings.json detected. Creating backup and resetting.")
+        logger.error("Corrupt settings.json detected; creating backup and resetting")
         os.rename(SETTINGS_FILE, BACKUP_FILE)
         settings = get_default_settings()
         with open(SETTINGS_FILE, "w") as file:
             json.dump(settings, file, indent=4)
-        return settings  
+        _settings_cache = settings
+        return settings
 
     except Exception as e:
-        print(f"❌ Unexpected error loading settings: {e}")
+        logger.error("Unexpected error loading settings: %s", e)
         return get_default_settings()
 
 
@@ -82,26 +101,16 @@ def load_settings():
 # ✅ Save Settings (Proper Async Handling)
 async def save_settings(updated_settings):
     """Save settings without overwriting non-changing values."""
+    global _settings_cache
     try:
-        print(f"\n🔍 DEBUG: [save_settings] Called with updated settings = {updated_settings}")
-
+        invalidate_settings_cache()
         if not isinstance(updated_settings, dict):
-            print(f"❌ ERROR: Expected dictionary, got {type(updated_settings)} - Converting to empty dictionary.")
             updated_settings = {}
 
-        # ✅ Load current settings FIRST
         current_settings = load_settings()
-
-        # ✅ Preserve existing timestamps & last pump activation before merging
         preserved_last_ph_check = current_settings.get("last_ph_check", "N/A")
         preserved_next_ph_check = current_settings.get("next_ph_check", "N/A")
         preserved_last_pump_activation = current_settings.get("last_pump_activation", {"pump": None, "timestamp": "N/A"})
-
-        # ✅ Debug: Print before merging
-        print(f"🔍 DEBUG: [save_settings] BEFORE MERGE")
-        print(f"  last_ph_check = {preserved_last_ph_check}")
-        print(f"  next_ph_check = {preserved_next_ph_check}")
-        print(f"  last_pump_activation = {preserved_last_pump_activation}")
 
         # ✅ Merge updated settings into current settings
         for key, value in updated_settings.items():
@@ -135,28 +144,19 @@ async def save_settings(updated_settings):
         elif current_settings["last_pump_activation"]["timestamp"] is None:
             current_settings["last_pump_activation"]["timestamp"] = "N/A"
 
-        # ✅ Debug: Print final values before saving
-        print(f"🔍 DEBUG: [save_settings] FINAL MERGE")
-        print(f"  last_ph_check = {current_settings.get('last_ph_check', 'N/A')}")
-        print(f"  next_ph_check = {current_settings.get('next_ph_check', 'N/A')}")
-        print(f"  last_pump_activation = {current_settings.get('last_pump_activation', 'N/A')}")
-
-        # ✅ Save to JSON file safely
         with open(SETTINGS_FILE, "w") as file:
             json.dump(current_settings, file, indent=4)
-
-        print("✅ Settings saved successfully!")
+        _settings_cache = current_settings
 
     except json.JSONDecodeError:
-        print("❌ ERROR: Corrupt settings.json detected. Resetting settings.")
+        logger.error("Corrupt settings.json detected; resetting settings")
         os.rename(SETTINGS_FILE, SETTINGS_FILE + ".backup")
         await save_settings(get_default_settings())
 
     except ValueError as ve:
-        print(f"❌ ERROR: {ve}")
-
+        logger.error("Settings save error: %s", ve)
     except Exception as e:
-        print(f"❌ ERROR saving settings: {e}")
+        logger.error("Error saving settings: %s", e)
 
 
 
@@ -182,7 +182,8 @@ def get_default_settings():
         },
         "sensor_intervals": {
             "ph_check_interval": 60,
-            "sensor_update_interval": 5
+            "sensor_update_interval": 5,
+            "ph_average_window_minutes": 5
         },
         "oled_page_interval_seconds": 10,
         "oled_config": {
