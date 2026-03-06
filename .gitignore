@@ -8,6 +8,8 @@ backend/src/.env
 # Dependencies / modules (do not track)
 node_modules/
 frontend/node_modules/
+venv/
+.venv/
 backend/venv/
 backend/.venv/
 backend/Adafruit_Python_DHT/
