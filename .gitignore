@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Safeguard: never commit env files or secrets
 .env
 .env.*
@@ -10,6 +11,43 @@ node_modules/
 frontend/node_modules/
 venv/
 .venv/
+backend/venv/
+backend/.venv/
+backend/Adafruit_Python_DHT/
+
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+*.py[cod]
+*.egg-info/
+.eggs/
+**/build/
+
+# Runtime data (created/updated by app — do not track)
+/backend/src/grow_logs.json
+/backend/src/settings.json
+/backend/src/settings_backup.json
+/backend/src/settings.json.bak
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+=======
+# Safeguard: never commit env files or secrets
+.env
+.env.*
+!.env.example
+backend/.env
+backend/src/.env
+
+# Dependencies / modules (do not track)
+node_modules/
+frontend/node_modules/
 backend/venv/
 backend/.venv/
 backend/Adafruit_Python_DHT/
