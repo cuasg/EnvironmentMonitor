@@ -10,9 +10,9 @@ influxdb-client>=1.36.0
 aiohttp>=3.8.0
 
 # Raspberry Pi hardware (install only on the Pi when dev_mode is False)
-# RPi.GPIO>=0.7.1
-# adafruit-circuitpython-ads1x15
-# adafruit-circuitpython-dht
-# w1thermsensor
-# adafruit-circuitpython-ssd1306
-Pillow>=9.0.0  # Required for OLED pixel rendering (works in dev mode too)
+RPi.GPIO>=0.7.1
+adafruit-circuitpython-ads1x15
+adafruit-circuitpython-dht
+w1thermsensor
+adafruit-circuitpython-ssd1306
+Pillow>=9.0.0
