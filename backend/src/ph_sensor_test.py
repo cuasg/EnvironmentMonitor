@@ -9,6 +9,7 @@ from adafruit_ads1x15.ads1115 import ADS1115
 # ✅ Load Calibration Data from settings.json
 SETTINGS_FILE = "/home/cuasg/plant/backend/src/settings.json"
 
+
 def load_calibration():
     """Load pH calibration data from settings.json."""
     try:
@@ -18,6 +19,7 @@ def load_calibration():
     except Exception as e:
         print(f"\n❌ ERROR: Failed to load calibration data: {e}")
         return {}
+
 
 # ✅ pH Conversion Function (Uses 2-point or 3-point Calibration)
 def convert_ph(voltage, calibration_data):
@@ -61,16 +63,15 @@ def convert_ph(voltage, calibration_data):
         return None
 
 
-
-# ✅ Initialize I2C for ADS1115 (pH Sensor)
-i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS1115(i2c)
-
 # ✅ Live pH Reading Loop
 def monitor_ph():
     """Continuously reads and updates pH sensor voltage and converted pH value."""
     calibration_data = load_calibration()
-    
+
+    # ✅ Initialize I2C for ADS1115 (pH Sensor)
+    i2c = busio.I2C(board.SCL, board.SDA)
+    ads = ADS1115(i2c)
+
     try:
         while True:
             # ✅ Read pH Sensor Voltage from ADS1115 A0
@@ -80,7 +81,9 @@ def monitor_ph():
             ph_value = convert_ph(ph_voltage, calibration_data)
 
             # ✅ Display updated values in place (No new lines)
-            sys.stdout.write(f"\r📡 pH Voltage: {ph_voltage:.3f}V | pH Value: {ph_value if ph_value is not None else '⚠ ERROR'}     ")
+            sys.stdout.write(
+                f"\r📡 pH Voltage: {ph_voltage:.3f}V | pH Value: {ph_value if ph_value is not None else '⚠ ERROR'}     "
+            )
             sys.stdout.flush()
 
             time.sleep(1)  # ✅ Update every second
@@ -88,6 +91,7 @@ def monitor_ph():
     except KeyboardInterrupt:
         print("\n🔴 Stopping pH Monitor.")
 
-# ✅ Run the pH monitor
-monitor_ph()
 
+if __name__ == "__main__":
+    # ✅ Run the pH monitor
+    monitor_ph()
