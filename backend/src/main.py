@@ -13,6 +13,22 @@ from database import log_sensor_data
 
 # Display timezone comes from settings (get_display_tz()); no hardcoded CST
 
+INTERRUPTIBLE_SLEEP_CHUNK = 1.0  # seconds; re-check monitoring enabled each chunk
+
+
+async def _sleep_until_disabled_or_elapsed(seconds: float) -> None:
+    """Sleep for up to `seconds`, but wake early if pH_monitoring_enabled becomes False."""
+    remaining = max(0.0, float(seconds))
+    while remaining > 0:
+        chunk = min(INTERRUPTIBLE_SLEEP_CHUNK, remaining)
+        await asyncio.sleep(chunk)
+        remaining -= chunk
+        if remaining <= 0:
+            break
+        s = load_settings()
+        if not s.get("pH_monitoring_enabled", False):
+            break
+
 _last_dev_mode = None
 
 
@@ -179,7 +195,7 @@ async def ph_monitoring():
             existing_settings["ph_check_active"] = False
 
             await save_settings(existing_settings)
-            await asyncio.sleep(ph_check_interval)
+            await _sleep_until_disabled_or_elapsed(ph_check_interval)
             continue
 
         # At this point we have a valid averaged pH value from the buffer only.
@@ -246,7 +262,7 @@ async def ph_monitoring():
 
         # ✅ Save updated timestamps and pH history
         await save_settings(existing_settings)
-        await asyncio.sleep(sleep_time)
+        await _sleep_until_disabled_or_elapsed(sleep_time)
 
 
 

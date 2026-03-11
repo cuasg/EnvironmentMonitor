@@ -199,8 +199,10 @@ async def save_settings(updated_settings):
 
     except ValueError as ve:
         logger.error("Settings save error: %s", ve)
+        raise
     except Exception as e:
         logger.error("Error saving settings: %s", e)
+        raise
 
 
 

@@ -429,10 +429,13 @@ const Dashboard = () => {
     const newState = !phMonitoring;
     runWithPin(async (token) => {
       try {
-        await updateSettings({ pH_monitoring_enabled: newState }, token);
-        setPhMonitoring(newState);
-        const updatedData = await getSettings();
-        if (updatedData) setPhMonitoring(!!updatedData.pH_monitoring_enabled);
+        const response = await updateSettings({ pH_monitoring_enabled: newState }, token);
+        const serverSettings = response?.data?.settings;
+        if (serverSettings && typeof serverSettings.pH_monitoring_enabled !== "undefined") {
+          setPhMonitoring(!!serverSettings.pH_monitoring_enabled);
+        } else {
+          setPhMonitoring(newState);
+        }
       } catch (error) {
         showToast(error.response?.data?.error || "Error updating pH monitoring.", "error");
       }

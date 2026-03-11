@@ -747,7 +747,13 @@ async def update_settings():
 
     await save_settings(data)
     asyncio.create_task(broadcast_settings_once())
-    return jsonify({"message": "Settings updated successfully!"})
+    # Return current settings so the client can sync state without a second GET
+    current = load_settings()
+    if "pin_auth" in current:
+        current = {k: v for k, v in current.items() if k != "pin_auth"}
+    current["pinConfigured"] = is_pin_configured()
+    current = _prepare_settings_for_ws(current)
+    return jsonify({"message": "Settings updated successfully!", "settings": current})
 
 # ✅ REST API for Manual Pump Activation (requires PIN session)
 @app.route("/activate-pump", methods=["POST"])

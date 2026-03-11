@@ -132,15 +132,12 @@ export const changePin = async (currentPin, newPin, sessionToken) => {
 };
 
 // ✅ Update Settings in Backend (pass sessionToken for protected updates: pump_settings, sensor_intervals, pH_monitoring_enabled)
+// Returns { data: { message, settings? } } so callers can sync state from response.settings
 export const updateSettings = async (updatedData, sessionToken = null) => {
-  try {
-    const headers = sessionToken ? { [PIN_SESSION_HEADER]: sessionToken } : {};
-    await api.post(API_PATHS.SETTINGS, updatedData, { headers });
-    console.log("✅ Settings updated!");
-  } catch (error) {
-    console.error("❌ Error updating settings:", error);
-    throw error;
-  }
+  const headers = sessionToken ? { [PIN_SESSION_HEADER]: sessionToken } : {};
+  const response = await api.post(API_PATHS.SETTINGS, updatedData, { headers });
+  console.log("✅ Settings updated!");
+  return response;
 };
 
 // ✅ Manual pump activation (requires sessionToken when PIN is configured)
