@@ -74,11 +74,23 @@ def load_settings():
             parsed_pump_timestamp = ensure_datetime(last_pump_timestamp)
             settings["last_pump_activation"]["timestamp"] = last_pump_timestamp if parsed_pump_timestamp is None else parsed_pump_timestamp.strftime("%Y-%m-%d %I:%M %p")
 
-        # ✅ Ensure oled_config exists with default pages if missing
+        # ✅ Merge in critical defaults when missing or malformed
+        default_settings = get_default_settings()
+
+        # OLED config
         if "oled_config" not in settings or not isinstance(settings["oled_config"], dict) or not settings["oled_config"].get("pages"):
             logger.debug("OLED config missing or empty, merging defaults")
-            default_settings = get_default_settings()
             settings["oled_config"] = default_settings.get("oled_config", {})
+
+        # Pump settings
+        pump_settings = settings.get("pump_settings")
+        if not isinstance(pump_settings, dict):
+            logger.warning("pump_settings missing or invalid in settings.json; applying defaults.")
+            settings["pump_settings"] = default_settings.get("pump_settings", {}).copy()
+        else:
+            merged = default_settings.get("pump_settings", {}).copy()
+            merged.update({k: v for k, v in pump_settings.items() if v is not None})
+            settings["pump_settings"] = merged
 
         _settings_cache = settings
         return settings

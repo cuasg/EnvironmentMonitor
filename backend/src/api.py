@@ -618,6 +618,50 @@ async def update_settings():
         err = require_pin_session()
         if err is not None:
             return err[0], err[1]
+
+    # Optional safety: validate pump_settings before saving
+    if "pump_settings" in data:
+        ps = data["pump_settings"]
+        if not isinstance(ps, dict):
+            return error_response("pump_settings must be an object", 400)
+
+        low = ps.get("low_pH")
+        high = ps.get("high_pH")
+        duration = ps.get("pump_duration")
+        stab = ps.get("stabilization_time")
+
+        def _is_number(v):
+            try:
+                float(v)
+                return True
+            except (TypeError, ValueError):
+                return False
+
+        if low is not None and not _is_number(low):
+            return error_response("pump_settings.low_pH must be a number", 400)
+        if high is not None and not _is_number(high):
+            return error_response("pump_settings.high_pH must be a number", 400)
+        if duration is not None and not _is_number(duration):
+            return error_response("pump_settings.pump_duration must be a number", 400)
+        if stab is not None and not _is_number(stab):
+            return error_response("pump_settings.stabilization_time must be a number", 400)
+
+        if low is not None and high is not None:
+            low_f = float(low)
+            high_f = float(high)
+            if not (1.0 <= low_f < high_f <= 14.0):
+                return error_response("pump_settings.high_pH must be greater than low_pH and both between 1 and 14", 400)
+
+        if duration is not None:
+            d = float(duration)
+            if not (1 <= d <= 30):
+                return error_response("pump_settings.pump_duration must be between 1 and 30 seconds", 400)
+
+        if stab is not None:
+            s = float(stab)
+            if s < 10:
+                return error_response("pump_settings.stabilization_time must be at least 10 seconds", 400)
+
     await save_settings(data)
     asyncio.create_task(broadcast_settings_once())
     return jsonify({"message": "Settings updated successfully!"})

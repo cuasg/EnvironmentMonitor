@@ -56,10 +56,16 @@ async def ph_monitoring():
 
         sensor_intervals = settings.get("sensor_intervals") or {}
         ph_check_interval = sensor_intervals.get("ph_check_interval", 60)
-        low_pH = settings["pump_settings"].get("low_pH", 5.7)
-        high_pH = settings["pump_settings"].get("high_pH", 6.3)
-        pump_duration = settings["pump_settings"].get("pump_duration", 5)
-        stabilization_time = settings["pump_settings"].get("stabilization_time", 30)
+
+        # Be defensive: pump_settings might be missing or malformed in settings.json
+        pump_settings = settings.get("pump_settings") or {}
+        if not isinstance(pump_settings, dict):
+            pump_settings = {}
+
+        low_pH = pump_settings.get("low_pH", 5.7)
+        high_pH = pump_settings.get("high_pH", 6.3)
+        pump_duration = pump_settings.get("pump_duration", 5)
+        stabilization_time = pump_settings.get("stabilization_time", 30)
 
         # Prefer an average of the most recent 30 continuous-cycle readings
         # so that scheduled checks are based on a stable value instead of
