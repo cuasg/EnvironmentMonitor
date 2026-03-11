@@ -1,20 +1,17 @@
 import asyncio
 import logging
 import time
-from datetime import datetime
-import pytz
-from settings import load_settings, save_settings
+from datetime import datetime, timedelta
+from settings import load_settings, save_settings, get_display_tz
 
 logger = logging.getLogger(__name__)
 from sensors import read_all_sensors, read_ph_sensor
 from pumps import activate_pump
 from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer, buffer_size, latest_age_seconds
 from database import log_sensor_data
-from datetime import datetime, timedelta
 
 
-# ✅ Set timezone to Central Standard Time (CST)
-CST = pytz.timezone("America/Chicago")
+# Display timezone comes from settings (get_display_tz()); no hardcoded CST
 
 _last_dev_mode = None
 
@@ -124,10 +121,11 @@ async def ph_monitoring():
         stabilization_time = pump_settings.get("stabilization_time", 30)
 
         # Mark the start of this pH check cycle so the UI can show the
-        # "checking" indicator and start timestamp.
+        # "checking" indicator and start timestamp. Use UTC with "Z" so the
+        # frontend parses it as UTC and displays in the same timezone as end.
         start_utc_iso = None
         try:
-            start_utc_iso = datetime.utcnow().isoformat()
+            start_utc_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         except Exception:
             start_utc_iso = None
         started_settings = load_settings()
@@ -167,14 +165,15 @@ async def ph_monitoring():
             existing_settings["ph_samples_required"] = samples_required
 
             # Mark that a check cycle ran but couldn't compute an average yet.
-            now_cst_end = datetime.now(CST)
-            now_cst_end_str = now_cst_end.strftime("%Y-%m-%d %I:%M %p")
-            next_check_time = now_cst_end + timedelta(seconds=ph_check_interval)
+            tz = get_display_tz()
+            now_end = datetime.now(tz)
+            now_end_str = now_end.strftime("%Y-%m-%d %I:%M %p")
+            next_check_time = now_end + timedelta(seconds=ph_check_interval)
             next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
-            existing_settings["last_ph_check"] = now_cst_end_str
+            existing_settings["last_ph_check"] = now_end_str
             existing_settings["next_ph_check"] = next_check_time_str
             try:
-                existing_settings["ph_check_ended_at"] = datetime.utcnow().isoformat()
+                existing_settings["ph_check_ended_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
             except Exception:
                 existing_settings["ph_check_ended_at"] = None
             existing_settings["ph_check_active"] = False
@@ -225,20 +224,22 @@ async def ph_monitoring():
         existing_settings["ph_samples_available"] = samples_used
         existing_settings["ph_samples_required"] = samples_required
 
-        # ✅ Get timestamp at the *end* of the check, after any pump action
-        now_cst_end = datetime.now(CST)
-        now_cst_end_str = now_cst_end.strftime("%Y-%m-%d %I:%M %p")
+        # ✅ Get timestamp at the *end* of the check, after any pump action (in display timezone)
+        tz = get_display_tz()
+        now_end = datetime.now(tz)
+        now_end_str = now_end.strftime("%Y-%m-%d %I:%M %p")
 
-        next_check_time = now_cst_end + timedelta(seconds=sleep_time)
+        next_check_time = now_end + timedelta(seconds=sleep_time)
         next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
 
-        existing_settings["last_ph_check"] = now_cst_end_str
+        existing_settings["last_ph_check"] = now_end_str
         existing_settings["next_ph_check"] = next_check_time_str
 
         # Mark when this check completed so the UI can stop showing the
-        # "active" indicator and record an explicit end timestamp.
+        # "active" indicator and record an explicit end timestamp (UTC with Z
+        # so frontend shows start and end in the same timezone).
         try:
-            existing_settings["ph_check_ended_at"] = datetime.utcnow().isoformat()
+            existing_settings["ph_check_ended_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         except Exception:
             existing_settings["ph_check_ended_at"] = None
         existing_settings["ph_check_active"] = False

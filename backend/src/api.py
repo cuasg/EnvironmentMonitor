@@ -7,14 +7,14 @@ import os
 import subprocess
 from quart import Quart, websocket, request, jsonify
 from quart_cors import cors
-from settings import load_settings, save_settings
+from settings import load_settings, save_settings, get_display_tz
 from pumps import activate_pump, start_pump_then_return
 from main import main  # ✅ Import the continuous monitoring loop
 from oled_display import async_display_oled  # ✅ Import OLED function
 from database import query_trends, TRENDS_AVAILABLE_FIELDS, check_influx_connection, get_influx_connection_status, get_influx_activity
 from oled_renderer import get_current_display_state
 from config import CORS_ALLOW_ORIGIN_LIST, API_HOST, API_PORT
-from datetime import datetime
+from datetime import datetime, timezone
 from grow_logs import load_grow_logs, save_grow_logs, get_primary_grow, get_grow, get_entry, export_grows_to_csv_rows
 from pin_auth import (
     is_pin_configured,
@@ -81,14 +81,11 @@ async def settings_ws():
     try:
         while True:
             settings = load_settings()
-            for key in ("last_ph_check", "next_ph_check"):
-                if key in settings and isinstance(settings[key], datetime):
-                    settings[key] = settings[key].strftime("%Y-%m-%d %I:%M:%S %p")
-            if "last_pump_activation" in settings and isinstance(settings["last_pump_activation"], dict):
-                ts = settings["last_pump_activation"].get("timestamp")
-                if isinstance(ts, datetime):
-                    settings["last_pump_activation"]["timestamp"] = ts.strftime("%Y-%m-%d %I:%M:%S %p")
-            json_settings = json.dumps(settings, default=serialize_datetime)
+            prepared = _prepare_settings_for_ws(settings)
+            if "pin_auth" in prepared:
+                del prepared["pin_auth"]
+            prepared["pinConfigured"] = is_pin_configured()
+            json_settings = json.dumps(prepared, default=serialize_datetime)
             await websocket.send(json_settings)
             await websocket.send(json.dumps({"message": "ping"}))
             await asyncio.sleep(WS_BROADCAST_INTERVAL)
@@ -99,16 +96,42 @@ async def settings_ws():
             connected_clients.remove(websocket)
 
 
+def _utc_iso_to_display_tz(utc_iso_str):
+    """Convert a UTC ISO timestamp (e.g. 2025-03-11T20:30:00Z) to display timezone string."""
+    if not utc_iso_str or not isinstance(utc_iso_str, str):
+        return utc_iso_str
+    try:
+        s = utc_iso_str.strip()
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        local = dt.astimezone(get_display_tz())
+        return local.strftime("%Y-%m-%d %I:%M %p")
+    except Exception:
+        return utc_iso_str
+
+
 def _prepare_settings_for_ws(settings):
-    """Prepare settings dict for WebSocket (datetime serialization, strip pin_auth)."""
+    """Prepare settings for API/WS: copy, serialize datetimes, convert UTC timestamps to display TZ."""
+    out = dict(settings)
+    if "last_pump_activation" in out and isinstance(out["last_pump_activation"], dict):
+        out["last_pump_activation"] = dict(out["last_pump_activation"])
+
     for key in ("last_ph_check", "next_ph_check"):
-        if key in settings and isinstance(settings[key], datetime):
-            settings[key] = settings[key].strftime("%Y-%m-%d %I:%M:%S %p")
-    if "last_pump_activation" in settings and isinstance(settings["last_pump_activation"], dict):
-        ts = settings["last_pump_activation"].get("timestamp")
+        if key in out and isinstance(out[key], datetime):
+            out[key] = out[key].strftime("%Y-%m-%d %I:%M %p")
+    if "last_pump_activation" in out and isinstance(out["last_pump_activation"], dict):
+        ts = out["last_pump_activation"].get("timestamp")
         if isinstance(ts, datetime):
-            settings["last_pump_activation"]["timestamp"] = ts.strftime("%Y-%m-%d %I:%M:%S %p")
-    return settings
+            out["last_pump_activation"]["timestamp"] = ts.strftime("%Y-%m-%d %I:%M %p")
+
+    # Convert UTC-stored check timestamps to display timezone so all times are consistent
+    for key in ("ph_check_started_at", "ph_check_ended_at"):
+        if key in out and out.get(key) and isinstance(out[key], str) and "T" in out[key]:
+            out[key] = _utc_iso_to_display_tz(out[key])
+    return out
 
 
 async def broadcast_settings_once():
@@ -139,14 +162,15 @@ async def websocket_broadcast_loop():
                 connected_clients.remove(client)
         await asyncio.sleep(WS_BROADCAST_INTERVAL)
 
-# ✅ REST API to Fetch Settings (strip pin_auth for security)
+# ✅ REST API to Fetch Settings (strip pin_auth, convert times to display TZ)
 @app.route("/settings", methods=["GET"])
 async def get_settings():
     settings = load_settings()
-    if "pin_auth" in settings:
-        settings = {k: v for k, v in settings.items() if k != "pin_auth"}
-    settings["pinConfigured"] = is_pin_configured()
-    return jsonify(settings)
+    data = _prepare_settings_for_ws(settings)
+    if "pin_auth" in data:
+        del data["pin_auth"]
+    data["pinConfigured"] = is_pin_configured()
+    return jsonify(data)
 
 
 # ✅ PIN Auth Endpoints
@@ -621,6 +645,7 @@ async def update_settings():
         "pH_monitoring_enabled",
         "ph_calibration",
         "influx_config",
+        "timezone",
     )
     if any(k in data for k in protected_keys):
         err = require_pin_session()
@@ -708,6 +733,17 @@ async def update_settings():
         if dev_min is not None and dev_max is not None:
             if not (1.0 <= dev_min < dev_max <= 14.0):
                 return error_response("dev_ph_max must be greater than dev_ph_min and both between 1 and 14", 400)
+
+    # Validate timezone (IANA name, e.g. America/Chicago)
+    if "timezone" in data:
+        try:
+            import pytz
+            tz_name = (data.get("timezone") or "").strip()
+            if not tz_name:
+                return error_response("timezone cannot be empty", 400)
+            pytz.timezone(tz_name)
+        except Exception:
+            return error_response("timezone must be a valid IANA timezone (e.g. America/Chicago)", 400)
 
     await save_settings(data)
     asyncio.create_task(broadcast_settings_once())

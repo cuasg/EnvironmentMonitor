@@ -1,12 +1,12 @@
 import asyncio
 from datetime import datetime
-import pytz
-from settings import load_settings, save_settings
+from settings import load_settings, save_settings, get_display_tz
 from grow_logs import log_pump_activation
 
 PUMP_UP_PIN = 18    # pH Up Pump (GPIO 18)
 PUMP_DOWN_PIN = 27  # pH Down Pump (GPIO 27)
-CST = pytz.timezone("America/Chicago")
+
+_DISPLAY_TIME_FMT = "%Y-%m-%d %I:%M %p"
 
 _gpio_initialized = False
 
@@ -30,18 +30,19 @@ async def _pump_off_after(pump_number: int, duration: int, ph_value: float = Non
     import RPi.GPIO as GPIO
     pump_pin = PUMP_UP_PIN if pump_number == 1 else PUMP_DOWN_PIN
     pump_label = "up" if pump_number == 1 else "down"
-    timestamp_cst = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
+    tz = get_display_tz()
+    timestamp_local = datetime.now(tz).strftime(_DISPLAY_TIME_FMT)
     try:
         await asyncio.sleep(duration)
         GPIO.output(pump_pin, GPIO.LOW)
-        off_time = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
-        print(f"✅ Pump {pump_number} ({pump_label}) deactivated at {off_time} CST.")
+        off_time = datetime.now(tz).strftime(_DISPLAY_TIME_FMT)
+        print(f"✅ Pump {pump_number} ({pump_label}) deactivated at {off_time}.")
         settings = load_settings()
-        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_cst}
+        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_local}
         await save_settings(settings)
         if ph_value:
-            log_pump_activation(pump_label, timestamp_cst, ph_value, is_manual=is_manual, duration_seconds=duration)
-        print(f"✅ Pump Activation Logged: {pump_label.capitalize()} pump ran at {timestamp_cst} CST.")
+            log_pump_activation(pump_label, timestamp_local, ph_value, is_manual=is_manual, duration_seconds=duration)
+        print(f"✅ Pump Activation Logged: {pump_label.capitalize()} pump ran at {timestamp_local}.")
     except Exception as e:
         print(f"❌ Error in pump off/save: {e}")
 
@@ -56,19 +57,20 @@ def start_pump_then_return(pump_number: int, duration: int, ph_value: float = No
     if ph_value is None:
         ph_value = settings.get("pH_value")
     pump_label = "up" if pump_number == 1 else "down"
-    timestamp_cst = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
+    tz = get_display_tz()
+    timestamp_local = datetime.now(tz).strftime(_DISPLAY_TIME_FMT)
 
     if settings.get("dev_mode", False):
-        print(f"🔧 Pump {pump_number} ({pump_label}) activation (dev mode, simulated) for {duration}s at {timestamp_cst} CST...")
-        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_cst}
-        asyncio.get_running_loop().create_task(_save_dev_pump_and_log(pump_label, timestamp_cst, ph_value, is_manual, duration))
+        print(f"🔧 Pump {pump_number} ({pump_label}) activation (dev mode, simulated) for {duration}s at {timestamp_local}...")
+        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_local}
+        asyncio.get_running_loop().create_task(_save_dev_pump_and_log(pump_label, timestamp_local, ph_value, is_manual, duration))
         print(f"✅ Pump activation logged (simulated).")
         return True
 
     _ensure_gpio()
     import RPi.GPIO as GPIO
     pump_pin = PUMP_UP_PIN if pump_number == 1 else PUMP_DOWN_PIN
-    print(f"⚡ Activating Pump {pump_number} ({pump_label}) for {duration} seconds at {timestamp_cst} CST...")
+    print(f"⚡ Activating Pump {pump_number} ({pump_label}) for {duration} seconds at {timestamp_local}...")
     try:
         GPIO.output(pump_pin, GPIO.HIGH)
         asyncio.get_running_loop().create_task(_pump_off_after(pump_number, duration, ph_value, is_manual))
@@ -78,13 +80,13 @@ def start_pump_then_return(pump_number: int, duration: int, ph_value: float = No
         return False
 
 
-async def _save_dev_pump_and_log(pump_label: str, timestamp_cst: str, ph_value, is_manual: bool, duration: int):
+async def _save_dev_pump_and_log(pump_label: str, timestamp_local: str, ph_value, is_manual: bool, duration: int):
     """Dev mode: save last_pump_activation and log (async, so API can return immediately)."""
     settings = load_settings()
-    settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_cst}
+    settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_local}
     await save_settings(settings)
     if ph_value:
-        log_pump_activation(pump_label, timestamp_cst, ph_value, is_manual=is_manual, duration_seconds=duration)
+        log_pump_activation(pump_label, timestamp_local, ph_value, is_manual=is_manual, duration_seconds=duration)
 
 
 async def activate_pump(pump_number: int, duration: int, ph_value: float = None, is_manual: bool = False):
@@ -100,15 +102,16 @@ async def activate_pump(pump_number: int, duration: int, ph_value: float = None,
 
     if settings.get("dev_mode", False):
         pump_label = "up" if pump_number == 1 else "down"
-        timestamp_cst = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
-        print(f"🔧 Pump {pump_number} ({pump_label}) activation (dev mode, simulated) for {duration}s at {timestamp_cst} CST...")
+        tz = get_display_tz()
+        timestamp_local = datetime.now(tz).strftime(_DISPLAY_TIME_FMT)
+        print(f"🔧 Pump {pump_number} ({pump_label}) activation (dev mode, simulated) for {duration}s at {timestamp_local}...")
         settings["last_pump_activation"] = {
             "pump": pump_label,
-            "timestamp": timestamp_cst
+            "timestamp": timestamp_local
         }
         await save_settings(settings)
         if ph_value:
-            log_pump_activation(pump_label, timestamp_cst, ph_value, is_manual=is_manual, duration_seconds=duration)
+            log_pump_activation(pump_label, timestamp_local, ph_value, is_manual=is_manual, duration_seconds=duration)
         print(f"✅ Pump activation logged (simulated).")
         return True
 
@@ -116,18 +119,19 @@ async def activate_pump(pump_number: int, duration: int, ph_value: float = None,
     import RPi.GPIO as GPIO
     pump_pin = PUMP_UP_PIN if pump_number == 1 else PUMP_DOWN_PIN
     pump_label = "up" if pump_number == 1 else "down"
-    timestamp_cst = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
-    print(f"⚡ Activating Pump {pump_number} ({pump_label}) for {duration} seconds at {timestamp_cst} CST...")
+    tz = get_display_tz()
+    timestamp_local = datetime.now(tz).strftime(_DISPLAY_TIME_FMT)
+    print(f"⚡ Activating Pump {pump_number} ({pump_label}) for {duration} seconds at {timestamp_local}...")
     try:
         GPIO.output(pump_pin, GPIO.HIGH)
         await asyncio.sleep(duration)
         GPIO.output(pump_pin, GPIO.LOW)
-        print(f"✅ Pump {pump_number} ({pump_label}) deactivated at {timestamp_cst} CST.")
+        print(f"✅ Pump {pump_number} ({pump_label}) deactivated at {timestamp_local}.")
         settings = load_settings()
-        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_cst}
+        settings["last_pump_activation"] = {"pump": pump_label, "timestamp": timestamp_local}
         await save_settings(settings)
         if ph_value:
-            log_pump_activation(pump_label, timestamp_cst, ph_value, is_manual=is_manual, duration_seconds=duration)
+            log_pump_activation(pump_label, timestamp_local, ph_value, is_manual=is_manual, duration_seconds=duration)
         print(f"✅ Pump Activation Logged: {pump_label.capitalize()} pump ran at {timestamp_cst} CST.")
         return True
     except Exception as e:

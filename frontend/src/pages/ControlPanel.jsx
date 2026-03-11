@@ -13,6 +13,7 @@ import OledEditor from "../components/OledEditor";
 import { STORAGE_KEYS } from "../constants";
 
 const defaultControlPanelTiles = [
+  { id: "general" },
   { id: "phCalibration" },
   { id: "phRegulation" },
   { id: "oled" },
@@ -20,6 +21,22 @@ const defaultControlPanelTiles = [
   { id: "devSim" },
   { id: "pumpManual" },
   { id: "changePin" },
+];
+
+const TIMEZONE_OPTIONS = [
+  { value: "America/New_York", label: "Eastern Time (America/New_York)" },
+  { value: "America/Chicago", label: "Central Time (America/Chicago)" },
+  { value: "America/Denver", label: "Mountain Time (America/Denver)" },
+  { value: "America/Phoenix", label: "Arizona (America/Phoenix)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (America/Los_Angeles)" },
+  { value: "America/Anchorage", label: "Alaska (America/Anchorage)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (Pacific/Honolulu)" },
+  { value: "UTC", label: "UTC" },
+  { value: "Europe/London", label: "Europe/London" },
+  { value: "Europe/Paris", label: "Europe/Paris" },
+  { value: "Europe/Berlin", label: "Europe/Berlin" },
+  { value: "Asia/Tokyo", label: "Asia/Tokyo" },
+  { value: "Australia/Sydney", label: "Australia/Sydney" },
 ];
 
 const Tile = ({ id, children }) => {
@@ -62,6 +79,7 @@ const ControlPanel = () => {
     dev_mode: false,
     dev_ph_min: 5.8,
     dev_ph_max: 6.5,
+    timezone: "America/Chicago",
   });
 
   const [lastSaved, setLastSaved] = useState(null);
@@ -118,6 +136,7 @@ const ControlPanel = () => {
             dev_mode: !!data.dev_mode,
             dev_ph_min: typeof data.dev_ph_min === "number" ? data.dev_ph_min : 5.8,
             dev_ph_max: typeof data.dev_ph_max === "number" ? data.dev_ph_max : 6.5,
+            timezone: (data.timezone && typeof data.timezone === "string") ? data.timezone : "America/Chicago",
           }));
           setLastSaved({
             calibration: { ph4_voltage: ph4, ph7_voltage: ph7, ph10_voltage: ph10 },
@@ -147,8 +166,23 @@ const ControlPanel = () => {
       ...prev,
       ph_voltage: formatNumber(data.ph_voltage),
       ph_value: formatNumber(data.pH_value),
+      ...(data.timezone && typeof data.timezone === "string" ? { timezone: data.timezone } : {}),
     }));
   }, []);
+
+  const handleTimezoneChange = (event) => {
+    const value = event.target.value;
+    if (!value) return;
+    setSettings((prev) => ({ ...prev, timezone: value }));
+    runWithPin(async (token) => {
+      try {
+        await updateSettings({ timezone: value }, token);
+        showToast("Timezone updated. All times in the app will use this zone.", "success");
+      } catch (err) {
+        showToast(err.response?.data?.error || "Failed to save timezone.", "error");
+      }
+    });
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -432,6 +466,29 @@ const ControlPanel = () => {
           <div className="control-panel-tiles">
           {tiles.map((tile) => (
             <Tile key={tile.id} id={tile.id}>
+              {tile.id === "general" && (
+              <div className="section">
+                <h2>Display &amp; timezone</h2>
+                <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
+                  All times in the app (pH check times, pump activations, etc.) use this timezone.
+                </p>
+                <label>Timezone</label>
+                <select
+                  name="timezone"
+                  value={settings.timezone}
+                  onChange={handleTimezoneChange}
+                  className="control-panel-select"
+                  aria-label="Display timezone"
+                >
+                  {!TIMEZONE_OPTIONS.some((o) => o.value === settings.timezone) && settings.timezone && (
+                    <option value={settings.timezone}>{settings.timezone}</option>
+                  )}
+                  {TIMEZONE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              )}
               {tile.id === "phCalibration" && (
               <div className="section">
         <h2>pH Calibration</h2>

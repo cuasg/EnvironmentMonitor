@@ -656,7 +656,10 @@ const Dashboard = () => {
                         : "N/A"}
                     </p>
                     <p>
-                      Check End: {formatTimestamp(sensorData.last_ph_check)}
+                      Check End:{" "}
+                      {sensorData.ph_check_ended_at
+                        ? formatTimestampWithDate(sensorData.ph_check_ended_at)
+                        : formatTimestamp(sensorData.last_ph_check)}
                       {sensorData.last_ph_value !== "N/A" && (
                         <> — pH {sensorData.last_ph_value}</>
                       )}

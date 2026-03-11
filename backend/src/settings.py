@@ -4,7 +4,11 @@ import asyncio
 import logging
 from datetime import datetime
 
+import pytz
+
 logger = logging.getLogger(__name__)
+
+DEFAULT_TIMEZONE = "America/Chicago"
 
 # Use env if set; otherwise same directory as this file (works on Pi and WSL)
 _SETTINGS_DIR = os.environ.get(
@@ -22,6 +26,15 @@ def invalidate_settings_cache():
     """Call when settings are written so next load reads fresh from disk."""
     global _settings_cache
     _settings_cache = None
+
+
+def get_display_tz():
+    """Return the app's display timezone (pytz) from settings. Used for all user-facing timestamps."""
+    try:
+        tz_name = load_settings().get("timezone", DEFAULT_TIMEZONE) or DEFAULT_TIMEZONE
+        return pytz.timezone(str(tz_name))
+    except Exception:
+        return pytz.timezone(DEFAULT_TIMEZONE)
 
 
 # ✅ Ensure timestamps are stored as strings in settings.json
@@ -101,13 +114,15 @@ def load_settings():
             merged_intervals.update({k: v for k, v in sensor_intervals.items() if v is not None})
             settings["sensor_intervals"] = merged_intervals
 
-        # Ensure new fields like ph_check_started_at / ph_check_ended_at / ph_check_active exist
+        # Ensure new fields like ph_check_started_at / ph_check_ended_at / ph_check_active / timezone exist
         if "ph_check_started_at" not in settings:
             settings["ph_check_started_at"] = default_settings.get("ph_check_started_at")
         if "ph_check_ended_at" not in settings:
             settings["ph_check_ended_at"] = default_settings.get("ph_check_ended_at")
         if "ph_check_active" not in settings:
             settings["ph_check_active"] = default_settings.get("ph_check_active")
+        if "timezone" not in settings or not settings.get("timezone"):
+            settings["timezone"] = default_settings.get("timezone", DEFAULT_TIMEZONE)
 
         _settings_cache = settings
         return settings
@@ -267,6 +282,7 @@ def get_default_settings():
         "ph_check_started_at": None,
         "ph_check_ended_at": None,
         "ph_check_active": False,
+        "timezone": DEFAULT_TIMEZONE,
         "influx_config": {},
         "last_pump_activation": {"pump": None, "timestamp": None},
         "dev_ph_min": 5.8,
