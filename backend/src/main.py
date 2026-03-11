@@ -65,7 +65,12 @@ async def ph_monitoring():
         settings = load_settings()
         _handle_dev_mode_transition(settings)
         if not settings.get("pH_monitoring_enabled", False):
-            await asyncio.sleep(5)
+            # When auto pH monitoring is toggled from OFF to ON in the UI,
+            # we want the next loop iteration (and thus the first averaged
+            # pH check and any pump action) to happen quickly. Keep this
+            # sleep short so enabling monitoring triggers a check almost
+            # immediately.
+            await asyncio.sleep(1)
             continue
 
         sensor_intervals = settings.get("sensor_intervals") or {}

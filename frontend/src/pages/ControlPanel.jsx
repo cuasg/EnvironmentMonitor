@@ -151,6 +151,16 @@ const ControlPanel = () => {
           [name]: value === "" ? "N/A" : parseFloat(value) || "N/A",
         };
     }
+    if (name === "ph_min_samples") {
+      const n = parseInt(value, 10);
+      if (Number.isNaN(n)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        ph_min_samples: n,
+      };
+    }
     if (name === "dev_ph_min" || name === "dev_ph_max") {
       return {
         ...prev,
