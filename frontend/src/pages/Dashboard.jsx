@@ -210,6 +210,8 @@ const Dashboard = () => {
     dev_mode: true,
     sensors_available: true,
     ph_check_started_at: null,
+    ph_samples_available: null,
+    ph_samples_required: null,
   });
 
   const [phMonitoring, setPhMonitoring] = useState(false);
@@ -272,6 +274,8 @@ const Dashboard = () => {
             dev_mode,
             sensors_available,
             ph_check_started_at: data.ph_check_started_at ?? null,
+            ph_samples_available: data.ph_samples_available ?? null,
+            ph_samples_required: data.ph_samples_required ?? null,
           });
           setSettingsForOled(data);
           setPhMonitoring(data.pH_monitoring_enabled);
@@ -378,6 +382,8 @@ const Dashboard = () => {
       dev_mode,
       sensors_available,
       ph_check_started_at: data.ph_check_started_at ?? prev.ph_check_started_at ?? null,
+      ph_samples_available: data.ph_samples_available ?? prev.ph_samples_available ?? null,
+      ph_samples_required: data.ph_samples_required ?? prev.ph_samples_required ?? null,
     }));
 
     const now = Date.now();
@@ -659,9 +665,18 @@ const Dashboard = () => {
                         <span className="ph-trend ph-trend-flat">→ Stable</span>
                       )}
                       {isPhCheckActive && (
-                        <span className="ph-check-active" title="pH monitoring check in progress">
-                          ⟳ Checking…
-                        </span>
+                        <>
+                          <span className="ph-check-active" title="pH monitoring check in progress">
+                            ⟳ Checking…
+                          </span>
+                          {sensorData.ph_samples_available != null &&
+                            sensorData.ph_samples_required != null && (
+                              <span className="ph-check-progress">
+                                {" "}
+                                ({sensorData.ph_samples_available}/{sensorData.ph_samples_required} reads)
+                              </span>
+                            )}
+                        </>
                       )}
                     </p>
                     <p>

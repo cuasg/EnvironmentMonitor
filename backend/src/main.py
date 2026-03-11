@@ -8,7 +8,7 @@ from settings import load_settings, save_settings
 logger = logging.getLogger(__name__)
 from sensors import read_all_sensors, read_ph_sensor
 from pumps import activate_pump
-from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer
+from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer, buffer_size
 from database import log_sensor_data
 from datetime import datetime, timedelta
 
@@ -107,11 +107,7 @@ async def ph_monitoring():
             await asyncio.sleep(10)
             continue
 
-        # ✅ Get current timestamp
-        now_cst = datetime.now(CST)
-        now_cst_str = now_cst.strftime("%Y-%m-%d %I:%M %p")
-
-        # ✅ Determine next check time & required sleep duration
+        # ✅ Determine next check's required sleep duration based on pH
         if avg_ph_value < low_pH:
             await activate_pump(1, pump_duration, ph_value=avg_ph_value)
             sleep_time = stabilization_time
@@ -120,9 +116,6 @@ async def ph_monitoring():
             sleep_time = stabilization_time
         else:
             sleep_time = ph_check_interval
-
-        next_check_time = now_cst + timedelta(seconds=sleep_time)
-        next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
 
         # Ensure timestamps and pH history persist correctly
         existing_settings = load_settings()
@@ -143,9 +136,27 @@ async def ph_monitoring():
             trend = "flat"
         existing_settings["ph_trend_direction"] = trend
 
-        existing_settings["last_ph_check"] = now_cst_str
+        # Track how many samples were available vs. the configured minimum
+        try:
+            total_samples_in_buffer = buffer_size()
+        except Exception:
+            total_samples_in_buffer = 0
+        samples_required = ph_min_samples
+        samples_used = min(total_samples_in_buffer, samples_required)
+        existing_settings["ph_samples_available"] = samples_used
+        existing_settings["ph_samples_required"] = samples_required
+
+        # ✅ Get timestamp at the *end* of the check, after any pump action
+        now_cst_end = datetime.now(CST)
+        now_cst_end_str = now_cst_end.strftime("%Y-%m-%d %I:%M %p")
+
+        next_check_time = now_cst_end + timedelta(seconds=sleep_time)
+        next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
+
+        existing_settings["last_ph_check"] = now_cst_end_str
         existing_settings["next_ph_check"] = next_check_time_str
-        # Mark when this check started so the UI can briefly show an
+
+        # Mark when this check completed so the UI can briefly show an
         # \"active\" indicator for the pH monitoring loop.
         try:
             existing_settings["ph_check_started_at"] = datetime.utcnow().isoformat()
