@@ -8,13 +8,25 @@ from settings import load_settings, save_settings
 logger = logging.getLogger(__name__)
 from sensors import read_all_sensors, read_ph_sensor
 from pumps import activate_pump
-from ph_buffer import add_reading, get_average, get_last_n_average
+from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer
 from database import log_sensor_data
 from datetime import datetime, timedelta
 
 
 # ✅ Set timezone to Central Standard Time (CST)
 CST = pytz.timezone("America/Chicago")
+
+_last_dev_mode = None
+
+
+def _handle_dev_mode_transition(settings):
+    """Clear the rolling pH buffer when switching from dev_mode ON to OFF."""
+    global _last_dev_mode
+    current = bool(settings.get("dev_mode", False))
+    if _last_dev_mode is True and current is False:
+        # We just left dev mode; drop simulated readings from the buffer
+        clear_buffer()
+    _last_dev_mode = current
 
 
 async def continuous_monitoring():
@@ -24,6 +36,7 @@ async def continuous_monitoring():
     while True:
         # Reload settings every iteration (captures dev_mode and interval changes)
         settings = load_settings()
+        _handle_dev_mode_transition(settings)
         sensor_intervals = settings.get("sensor_intervals") or {}
         sensor_update_interval = sensor_intervals.get("sensor_update_interval", 60)
 
@@ -50,12 +63,20 @@ async def ph_monitoring():
     """Continuously monitors pH and activates pumps if needed."""
     while True:
         settings = load_settings()
+        _handle_dev_mode_transition(settings)
         if not settings.get("pH_monitoring_enabled", False):
             await asyncio.sleep(5)
             continue
 
         sensor_intervals = settings.get("sensor_intervals") or {}
         ph_check_interval = sensor_intervals.get("ph_check_interval", 60)
+        ph_min_samples = sensor_intervals.get("ph_min_samples", 10)
+        try:
+            ph_min_samples = int(ph_min_samples)
+        except (TypeError, ValueError):
+            ph_min_samples = 10
+        if ph_min_samples < 1:
+            ph_min_samples = 1
 
         # Be defensive: pump_settings might be missing or malformed in settings.json
         pump_settings = settings.get("pump_settings") or {}
@@ -69,8 +90,9 @@ async def ph_monitoring():
 
         # Prefer an average of the most recent 30 continuous-cycle readings
         # so that scheduled checks are based on a stable value instead of
-        # a single potentially noisy sample.
-        avg_ph_value = get_last_n_average(count=30, min_readings=10)
+        # a single potentially noisy sample. The minimum number of samples
+        # required can be tuned via sensor_intervals.ph_min_samples.
+        avg_ph_value = get_last_n_average(count=30, min_readings=ph_min_samples)
         if avg_ph_value is None:
             avg_ph_voltage, avg_ph_value = await read_ph_sensor()
         else:

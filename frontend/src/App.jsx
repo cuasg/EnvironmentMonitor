@@ -2,6 +2,7 @@ import React, { useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import InfluxStatusPopup from "./components/InfluxStatusPopup";
+import InfluxActivityIndicator from "./components/InfluxActivityIndicator";
 import PinSetup from "./components/PinSetup";
 import PinModal from "./components/PinModal";
 import Toast from "./components/Toast";
@@ -65,6 +66,7 @@ const App = () => {
         Skip to main content
       </a>
       <InfluxStatusPopup />
+      <InfluxActivityIndicator />
       <PinModal />
       <Toast />
       {!isKiosk && <Navbar />}

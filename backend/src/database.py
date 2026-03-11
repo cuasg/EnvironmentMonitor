@@ -16,6 +16,12 @@ client = None
 write_api = None
 _cached_config = None  # (url, token, org, bucket) used to build client
 _influx_connection_status = {"connected": False, "error": None}
+_influx_activity = {
+    "last_write_ok_at": None,
+    "last_write_error": None,
+    "last_read_ok_at": None,
+    "last_read_error": None,
+}
 
 
 def _get_influx_config():
@@ -133,6 +139,11 @@ def get_influx_connection_status():
     """Get current InfluxDB connection status."""
     return _influx_connection_status.copy()
 
+
+def get_influx_activity():
+    """Get last Influx read/write activity for UI indicators."""
+    return _influx_activity.copy()
+
 # ✅ Function to Ensure Consistent Data Types
 def enforce_type(value, field_name, value_type):
     """
@@ -243,8 +254,13 @@ async def log_sensor_data():
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, params=params, data=line_protocol_data) as response:
-                if response.status != 204:
-                    logging.error("InfluxDB write failed: %s %s", response.status, await response.text())
+                if response.status == 204:
+                    _influx_activity["last_write_ok_at"] = time.time()
+                    _influx_activity["last_write_error"] = None
+                else:
+                    body = await response.text()
+                    logging.error("InfluxDB write failed: %s %s", response.status, body)
+                    _influx_activity["last_write_error"] = body or f"HTTP {response.status}"
     except Exception as e:
         logging.error("Error logging sensor data: %s", e)
 
@@ -307,7 +323,10 @@ def query_trends(range_minutes, fields):
                 except (TypeError, ValueError):
                     by_time[time_key][field] = value
         result = sorted(by_time.values(), key=lambda x: x["time"])
+        _influx_activity["last_read_ok_at"] = time.time()
+        _influx_activity["last_read_error"] = None
         return result
     except Exception as e:
         logging.error("Trends query error: %s", e)
+        _influx_activity["last_read_error"] = str(e)
         return []

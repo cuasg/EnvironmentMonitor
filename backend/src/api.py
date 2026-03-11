@@ -11,7 +11,7 @@ from settings import load_settings, save_settings
 from pumps import activate_pump, start_pump_then_return
 from main import main  # ✅ Import the continuous monitoring loop
 from oled_display import async_display_oled  # ✅ Import OLED function
-from database import query_trends, TRENDS_AVAILABLE_FIELDS, check_influx_connection, get_influx_connection_status
+from database import query_trends, TRENDS_AVAILABLE_FIELDS, check_influx_connection, get_influx_connection_status, get_influx_activity
 from oled_renderer import get_current_display_state
 from config import CORS_ALLOW_ORIGIN_LIST, API_HOST, API_PORT
 from datetime import datetime
@@ -267,8 +267,16 @@ async def get_oled_display():
 
 @app.route("/influx/status", methods=["GET"])
 async def get_influx_status():
-    """Get InfluxDB connection status."""
-    return jsonify(get_influx_connection_status())
+    """Get InfluxDB connection status and recent activity."""
+    status = get_influx_connection_status()
+    settings = load_settings()
+    activity = get_influx_activity()
+    return jsonify({
+        "connected": status.get("connected", False),
+        "error": status.get("error"),
+        "dev_mode": bool(settings.get("dev_mode", False)),
+        "activity": activity,
+    })
 
 
 @app.route("/health", methods=["GET"])
@@ -661,6 +669,45 @@ async def update_settings():
             s = float(stab)
             if s < 10:
                 return error_response("pump_settings.stabilization_time must be at least 10 seconds", 400)
+
+    # Optional safety: validate sensor_intervals, including ph_min_samples
+    if "sensor_intervals" in data:
+        si = data["sensor_intervals"]
+        if not isinstance(si, dict):
+            return error_response("sensor_intervals must be an object", 400)
+
+        ph_min_samples = si.get("ph_min_samples")
+
+        def _is_int(v):
+            try:
+                int(v)
+                return True
+            except (TypeError, ValueError):
+                return False
+
+        if ph_min_samples is not None and not _is_int(ph_min_samples):
+            return error_response("sensor_intervals.ph_min_samples must be an integer", 400)
+
+        if ph_min_samples is not None:
+            pms = int(ph_min_samples)
+            if pms < 1 or pms > 500:
+                return error_response("sensor_intervals.ph_min_samples must be between 1 and 500", 400)
+
+    # Optional safety: validate dev-mode simulated pH range
+    if "dev_ph_min" in data or "dev_ph_max" in data:
+        dev_min = data.get("dev_ph_min")
+        dev_max = data.get("dev_ph_max")
+        try:
+            if dev_min is not None:
+                dev_min = float(dev_min)
+            if dev_max is not None:
+                dev_max = float(dev_max)
+        except (TypeError, ValueError):
+            return error_response("dev_ph_min and dev_ph_max must be numbers", 400)
+
+        if dev_min is not None and dev_max is not None:
+            if not (1.0 <= dev_min < dev_max <= 14.0):
+                return error_response("dev_ph_max must be greater than dev_ph_min and both between 1 and 14", 400)
 
     await save_settings(data)
     asyncio.create_task(broadcast_settings_once())

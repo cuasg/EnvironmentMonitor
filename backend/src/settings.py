@@ -92,6 +92,15 @@ def load_settings():
             merged.update({k: v for k, v in pump_settings.items() if v is not None})
             settings["pump_settings"] = merged
 
+        # Sensor intervals (ensure new fields like ph_min_samples exist)
+        sensor_intervals = settings.get("sensor_intervals")
+        if not isinstance(sensor_intervals, dict):
+            settings["sensor_intervals"] = default_settings.get("sensor_intervals", {}).copy()
+        else:
+            merged_intervals = default_settings.get("sensor_intervals", {}).copy()
+            merged_intervals.update({k: v for k, v in sensor_intervals.items() if v is not None})
+            settings["sensor_intervals"] = merged_intervals
+
         _settings_cache = settings
         return settings
 
@@ -195,7 +204,8 @@ def get_default_settings():
         "sensor_intervals": {
             "ph_check_interval": 60,
             "sensor_update_interval": 5,
-            "ph_average_window_minutes": 5
+            "ph_average_window_minutes": 5,
+            "ph_min_samples": 10,
         },
         "oled_page_interval_seconds": 10,
         "oled_config": {
@@ -248,6 +258,8 @@ def get_default_settings():
         "next_ph_check": None,
         "influx_config": {},
         "last_pump_activation": {"pump": None, "timestamp": None},
+        "dev_ph_min": 5.8,
+        "dev_ph_max": 6.5,
         "sensors_available": True,
         "sensors_unavailable_reason": None,
         "ph_voltage": None,

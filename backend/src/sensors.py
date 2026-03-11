@@ -22,11 +22,30 @@ _DRIFT = 0.08  # max random drift
 
 
 def _simulate_ph():
-    """Return (ph_voltage, pH_value) in plausible range."""
+    """Return (ph_voltage, pH_value) in plausible range.
+
+    pH range is configurable via settings when dev_mode is enabled so that
+    pH monitoring behavior can be exercised across thresholds.
+    """
+    settings = load_settings()
+    dev_min = settings.get("dev_ph_min", 5.8)
+    dev_max = settings.get("dev_ph_max", 6.5)
+    try:
+        dev_min = float(dev_min)
+        dev_max = float(dev_max)
+    except (TypeError, ValueError):
+        dev_min, dev_max = 5.8, 6.5
+    if not (1.0 <= dev_min < dev_max <= 14.0):
+        dev_min, dev_max = 5.8, 6.5
+
     v = _SIM_PH_VOLTAGE_BASE + random.uniform(-_DRIFT, _DRIFT)
     v = max(2.0, min(2.9, v))
-    p = _SIM_PH_VALUE_BASE + random.uniform(-0.15, 0.15)
-    p = max(5.8, min(6.5, round(p, 1)))
+
+    # Bias pH into the configured dev range with slight jitter so graphs move
+    p_base = random.uniform(dev_min, dev_max)
+    p = p_base + random.uniform(-0.05, 0.05)
+    p = max(dev_min, min(dev_max, round(p, 1)))
+
     return round(v, 3), p
 
 

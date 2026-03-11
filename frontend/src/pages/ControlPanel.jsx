@@ -1,11 +1,41 @@
 import MultiRangeSlider from "multi-range-slider-react";
 import React, { useState, useEffect, useCallback } from "react";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import "/src/styles/ControlPanel.css";
 import api, { getSettings, updateSettings, connectWebSocket, activatePump as apiActivatePump, changePin, verifyPin, getInfluxConfig, saveInfluxConfig } from "../api";
 import { formatNumber } from "../utils/format";
 import { useAuth, PIN_LENGTH } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import OledEditor from "../components/OledEditor";
+import { STORAGE_KEYS } from "../constants";
+
+const defaultControlPanelTiles = [
+  { id: "phCalibration" },
+  { id: "phRegulation" },
+  { id: "oled" },
+  { id: "influx" },
+  { id: "devSim" },
+  { id: "pumpManual" },
+  { id: "changePin" },
+];
+
+const Tile = ({ id, children }) => {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} {...attributes} {...listeners} className="section-tile" style={style}>
+      {children}
+    </div>
+  );
+};
 
 const ControlPanel = () => {
   const [settings, setSettings] = useState({
@@ -20,6 +50,10 @@ const ControlPanel = () => {
     stabilization_time: 30,
     ph_check_interval: 600,
     sensor_update_interval: 5,
+    ph_min_samples: 10,
+    dev_mode: false,
+    dev_ph_min: 5.8,
+    dev_ph_max: 6.5,
   });
 
   const [lastSaved, setLastSaved] = useState(null);
@@ -41,6 +75,8 @@ const ControlPanel = () => {
   const [controlPanelLoading, setControlPanelLoading] = useState(true);
   const [controlPanelError, setControlPanelError] = useState(null);
   const [controlPanelRetry, setControlPanelRetry] = useState(0);
+
+  const [tiles, setTiles] = useState(defaultControlPanelTiles);
 
   useEffect(() => {
     async function fetchData() {
@@ -70,6 +106,10 @@ const ControlPanel = () => {
             stabilization_time: parseInt(pump?.stabilization_time ?? 30, 10),
             ph_check_interval: parseInt(intervals?.ph_check_interval ?? 600, 10),
             sensor_update_interval: parseInt(intervals?.sensor_update_interval ?? 5, 10),
+            ph_min_samples: parseInt(intervals?.ph_min_samples ?? 10, 10),
+            dev_mode: !!data.dev_mode,
+            dev_ph_min: typeof data.dev_ph_min === "number" ? data.dev_ph_min : 5.8,
+            dev_ph_max: typeof data.dev_ph_max === "number" ? data.dev_ph_max : 6.5,
           }));
           setLastSaved({
             calibration: { ph4_voltage: ph4, ph7_voltage: ph7, ph10_voltage: ph10 },
@@ -80,6 +120,7 @@ const ControlPanel = () => {
               stabilization_time: parseInt(pump?.stabilization_time ?? 30, 10),
               ph_check_interval: parseInt(intervals?.ph_check_interval ?? 600, 10),
               sensor_update_interval: parseInt(intervals?.sensor_update_interval ?? 5, 10),
+              ph_min_samples: parseInt(intervals?.ph_min_samples ?? 10, 10),
             },
           });
         }
@@ -109,6 +150,12 @@ const ControlPanel = () => {
           ...prev,
           [name]: value === "" ? "N/A" : parseFloat(value) || "N/A",
         };
+    }
+    if (name === "dev_ph_min" || name === "dev_ph_max") {
+      return {
+        ...prev,
+        [name]: value,
+      };
       }
       return {
         ...prev,
@@ -132,7 +179,8 @@ const ControlPanel = () => {
       settings.pump_duration !== lastSaved.regulation.pump_duration ||
       settings.stabilization_time !== lastSaved.regulation.stabilization_time ||
       settings.ph_check_interval !== lastSaved.regulation.ph_check_interval ||
-      settings.sensor_update_interval !== lastSaved.regulation.sensor_update_interval);
+      settings.sensor_update_interval !== lastSaved.regulation.sensor_update_interval ||
+      settings.ph_min_samples !== lastSaved.regulation.ph_min_samples);
 
   const pushToConfig = () => {
     runWithPin(async (token) => {
@@ -184,6 +232,7 @@ const ControlPanel = () => {
           sensor_intervals: {
             ph_check_interval: parseInt(settings.ph_check_interval),
             sensor_update_interval: parseInt(settings.sensor_update_interval),
+            ph_min_samples: parseInt(settings.ph_min_samples),
           },
         }, token);
         setLastSaved((prev) => ({
@@ -195,6 +244,7 @@ const ControlPanel = () => {
             stabilization_time: settings.stabilization_time,
             ph_check_interval: settings.ph_check_interval,
             sensor_update_interval: settings.sensor_update_interval,
+            ph_min_samples: settings.ph_min_samples,
           },
         }));
         showToast("Settings saved.", "success");
@@ -290,6 +340,36 @@ const ControlPanel = () => {
     }
   };
 
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = tiles.findIndex((t) => t.id === active.id);
+    const newIndex = tiles.findIndex((t) => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newOrder = arrayMove(tiles, oldIndex, newIndex);
+    setTiles(newOrder);
+    localStorage.setItem(STORAGE_KEYS.CONTROL_PANEL_TILES, JSON.stringify(newOrder));
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CONTROL_PANEL_TILES);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return;
+      const defaultIds = defaultControlPanelTiles.map((t) => t.id);
+      const savedIds = parsed.map((t) => t.id).filter((id) => defaultIds.includes(id));
+      const base = savedIds
+        .map((id) => defaultControlPanelTiles.find((t) => t.id === id))
+        .filter(Boolean);
+      const missing = defaultControlPanelTiles.filter((t) => !savedIds.includes(t.id));
+      const order = [...base, ...missing];
+      setTiles(order);
+    } catch {
+      // ignore bad saved data
+    }
+  }, []);
+
   return (
     <div className="control-panel">
       <h1>Control Panel</h1>
@@ -308,9 +388,13 @@ const ControlPanel = () => {
         </div>
       )}
       {!controlPanelLoading && !controlPanelError && (
-      <>
-      {/* 🔹 pH Calibration Section */}
-      <div className="section">
+      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={tiles.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          <div className="control-panel-tiles">
+          {tiles.map((tile) => (
+            <Tile key={tile.id} id={tile.id}>
+              {tile.id === "phCalibration" && (
+              <div className="section">
         <h2>pH Calibration</h2>
         <p>Current Voltage: {settings.ph_voltage}V | pH: {settings.ph_value}</p>
         <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "var(--space-xs)" }}>
@@ -347,8 +431,9 @@ const ControlPanel = () => {
           <button className="save-settings-button" onClick={pushToConfig}>Save</button>
         )}
       </div>
+              )}
   
-      {/* 🔹 pH Regulation Settings */}
+              {tile.id === "phRegulation" && (
       <div className="section">
         <h2>pH Regulation Settings</h2>
   
@@ -383,19 +468,31 @@ const ControlPanel = () => {
   
         <label>Sensor Update Interval (sec):</label>
         <input type="number" name="sensor_update_interval" value={settings.sensor_update_interval} onChange={handleChange} />
+
+        <label>Min samples for pH average:</label>
+        <input
+          type="number"
+          name="ph_min_samples"
+          min={1}
+          max={500}
+          value={settings.ph_min_samples}
+          onChange={handleChange}
+        />
   
         {isRegulationDirty && (
           <button className="save-settings-button" onClick={savePhRegulationSettings}>Save</button>
         )}
       </div>
-
-      {/* 🔹 OLED Display Configuration */}
+              )}
+  
+              {tile.id === "oled" && (
       <div className="section oled-section">
         <h2>OLED Display Configuration</h2>
         <OledEditor />
       </div>
-
-      {/* 🔹 InfluxDB Configuration (PIN protected to save) */}
+              )}
+  
+              {tile.id === "influx" && (
       <div className="section">
         <h2>InfluxDB Configuration</h2>
         <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
@@ -439,8 +536,60 @@ const ControlPanel = () => {
           Save InfluxDB Config
         </button>
       </div>
+              )}
   
-      {/* 🔹 Manual Pump Control */}
+              {tile.id === "devSim" && settings.dev_mode && (
+        <div className="section">
+          <h2>Dev Mode Simulation</h2>
+          <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "var(--space-sm)" }}>
+            Simulated pH readings will stay within this range while dev mode is ON. This lets you test pH monitoring
+            behavior around your thresholds without using real sensors. Influx logging is skipped in dev mode.
+          </p>
+          <label>Simulated pH minimum:</label>
+          <input
+            type="number"
+            name="dev_ph_min"
+            step="0.01"
+            min={1}
+            max={14}
+            value={settings.dev_ph_min}
+            onChange={handleChange}
+          />
+          <label>Simulated pH maximum:</label>
+          <input
+            type="number"
+            name="dev_ph_max"
+            step="0.01"
+            min={1}
+            max={14}
+            value={settings.dev_ph_max}
+            onChange={handleChange}
+          />
+          <button
+            className="save-settings-button"
+            onClick={() => {
+              runWithPin(async (token) => {
+                try {
+                  await updateSettings(
+                    {
+                      dev_ph_min: parseFloat(settings.dev_ph_min),
+                      dev_ph_max: parseFloat(settings.dev_ph_max),
+                    },
+                    token
+                  );
+                  showToast("Dev mode pH range saved.", "success");
+                } catch (error) {
+                  showToast(error.response?.data?.error || "Error updating dev pH range.", "error");
+                }
+              });
+            }}
+          >
+            Save Dev pH Range
+          </button>
+        </div>
+              )}
+  
+              {tile.id === "pumpManual" && (
       <div className="section">
         <h2>Manual Pump Control</h2>
         <label>Pump Run Duration (sec):</label>
@@ -455,9 +604,9 @@ const ControlPanel = () => {
           </button>
         </div>
       </div>
-
-      {/* Change PIN - show when PIN is configured */}
-      {pinConfigured && (
+              )}
+  
+              {tile.id === "changePin" && pinConfigured && (
         <div className="section">
           <h2>Change PIN</h2>
           <form onSubmit={handleChangePin}>
@@ -493,8 +642,12 @@ const ControlPanel = () => {
             <button type="submit" className="save-settings-button">Change PIN</button>
           </form>
         </div>
-      )}
-      </>
+              )}
+            </Tile>
+          ))}
+          </div>
+        </SortableContext>
+      </DndContext>
       )}
     </div>
   );

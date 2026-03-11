@@ -7,6 +7,7 @@
 export const STORAGE_KEYS = {
   OLED_PREVIEW: "oled-preview-settings",
   TILE_ORDER: "tileOrder",
+  CONTROL_PANEL_TILES: "control-panel-tiles",
   TRENDS_SENSORS: "trends-selected-sensors",
   TRENDS_RANGE: "trends-range",
   NUTRIENT_CALC: "nutrient-calculator",

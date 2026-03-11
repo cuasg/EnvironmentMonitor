@@ -48,3 +48,8 @@ def get_last_n_average(count: int = 30, min_readings: int | None = None) -> floa
         return None
 
     return round(sum(recent_values) / len(recent_values), 1)
+
+
+def clear_buffer() -> None:
+    """Clear all stored pH readings from the rolling buffer."""
+    _buffer.clear()
