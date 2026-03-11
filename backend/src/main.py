@@ -123,6 +123,18 @@ async def ph_monitoring():
         pump_duration = pump_settings.get("pump_duration", 5)
         stabilization_time = pump_settings.get("stabilization_time", 30)
 
+        # Mark the start of this pH check cycle so the UI can show the
+        # "checking" indicator and start timestamp.
+        start_utc_iso = None
+        try:
+            start_utc_iso = datetime.utcnow().isoformat()
+        except Exception:
+            start_utc_iso = None
+        started_settings = load_settings()
+        started_settings["ph_check_started_at"] = start_utc_iso
+        started_settings["ph_check_active"] = True
+        await save_settings(started_settings)
+
         # Prefer an average of the most recent 30 continuous-cycle readings
         # so that scheduled checks are based on a stable value instead of
         # a single potentially noisy sample. The minimum number of samples
@@ -162,9 +174,10 @@ async def ph_monitoring():
             existing_settings["last_ph_check"] = now_cst_end_str
             existing_settings["next_ph_check"] = next_check_time_str
             try:
-                existing_settings["ph_check_started_at"] = datetime.utcnow().isoformat()
+                existing_settings["ph_check_ended_at"] = datetime.utcnow().isoformat()
             except Exception:
-                existing_settings["ph_check_started_at"] = None
+                existing_settings["ph_check_ended_at"] = None
+            existing_settings["ph_check_active"] = False
 
             await save_settings(existing_settings)
             await asyncio.sleep(ph_check_interval)
@@ -222,12 +235,13 @@ async def ph_monitoring():
         existing_settings["last_ph_check"] = now_cst_end_str
         existing_settings["next_ph_check"] = next_check_time_str
 
-        # Mark when this check completed so the UI can briefly show an
-        # \"active\" indicator for the pH monitoring loop.
+        # Mark when this check completed so the UI can stop showing the
+        # "active" indicator and record an explicit end timestamp.
         try:
-            existing_settings["ph_check_started_at"] = datetime.utcnow().isoformat()
+            existing_settings["ph_check_ended_at"] = datetime.utcnow().isoformat()
         except Exception:
-            existing_settings["ph_check_started_at"] = None
+            existing_settings["ph_check_ended_at"] = None
+        existing_settings["ph_check_active"] = False
 
         # ✅ Save updated timestamps and pH history
         await save_settings(existing_settings)

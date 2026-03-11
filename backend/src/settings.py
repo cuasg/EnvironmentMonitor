@@ -101,9 +101,13 @@ def load_settings():
             merged_intervals.update({k: v for k, v in sensor_intervals.items() if v is not None})
             settings["sensor_intervals"] = merged_intervals
 
-        # Ensure new fields like ph_check_started_at exist
+        # Ensure new fields like ph_check_started_at / ph_check_ended_at / ph_check_active exist
         if "ph_check_started_at" not in settings:
             settings["ph_check_started_at"] = default_settings.get("ph_check_started_at")
+        if "ph_check_ended_at" not in settings:
+            settings["ph_check_ended_at"] = default_settings.get("ph_check_ended_at")
+        if "ph_check_active" not in settings:
+            settings["ph_check_active"] = default_settings.get("ph_check_active")
 
         _settings_cache = settings
         return settings
@@ -261,6 +265,8 @@ def get_default_settings():
         "last_ph_check": None,
         "next_ph_check": None,
         "ph_check_started_at": None,
+        "ph_check_ended_at": None,
+        "ph_check_active": False,
         "influx_config": {},
         "last_pump_activation": {"pump": None, "timestamp": None},
         "dev_ph_min": 5.8,

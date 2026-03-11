@@ -210,6 +210,8 @@ const Dashboard = () => {
     dev_mode: true,
     sensors_available: true,
     ph_check_started_at: null,
+    ph_check_ended_at: null,
+    ph_check_active: false,
     ph_samples_available: null,
     ph_samples_required: null,
   });
@@ -274,6 +276,8 @@ const Dashboard = () => {
             dev_mode,
             sensors_available,
             ph_check_started_at: data.ph_check_started_at ?? null,
+            ph_check_ended_at: data.ph_check_ended_at ?? null,
+            ph_check_active: data.ph_check_active ?? false,
             ph_samples_available: data.ph_samples_available ?? null,
             ph_samples_required: data.ph_samples_required ?? null,
           });
@@ -382,6 +386,8 @@ const Dashboard = () => {
       dev_mode,
       sensors_available,
       ph_check_started_at: data.ph_check_started_at ?? prev.ph_check_started_at ?? null,
+      ph_check_ended_at: data.ph_check_ended_at ?? prev.ph_check_ended_at ?? null,
+      ph_check_active: data.ph_check_active ?? prev.ph_check_active ?? false,
       ph_samples_available: data.ph_samples_available ?? prev.ph_samples_available ?? null,
       ph_samples_required: data.ph_samples_required ?? prev.ph_samples_required ?? null,
     }));
@@ -487,14 +493,7 @@ const Dashboard = () => {
     });
   };
 
-  const isPhCheckActive = (() => {
-    // Only show an active check when auto pH monitoring is enabled
-    if (!phMonitoring) return false;
-    if (!sensorData.ph_check_started_at) return false;
-    const t = new Date(sensorData.ph_check_started_at).getTime();
-    if (Number.isNaN(t)) return false;
-    return nowMs - t < 5000;
-  })();
+  const isPhCheckActive = phMonitoring && sensorData.ph_check_active;
 
   return (
     <div className="dashboard">
@@ -650,9 +649,14 @@ const Dashboard = () => {
                 {item.id === "history" && (
                   <>
                     <h3>pH History</h3>
-                    <p>Next Check: {formatTimestamp(sensorData.next_ph_check)}</p>
                     <p>
-                      Last Check: {formatTimestamp(sensorData.last_ph_check)}
+                      Check Start:{" "}
+                      {sensorData.ph_check_started_at
+                        ? formatTimestampWithDate(sensorData.ph_check_started_at)
+                        : "N/A"}
+                    </p>
+                    <p>
+                      Check End: {formatTimestamp(sensorData.last_ph_check)}
                       {sensorData.last_ph_value !== "N/A" && (
                         <> — pH {sensorData.last_ph_value}</>
                       )}
@@ -681,6 +685,7 @@ const Dashboard = () => {
                         </>
                       )}
                     </p>
+                    <p>Next Check: {formatTimestamp(sensorData.next_ph_check)}</p>
                     <p>
                       Last Pump:{" "}
                       {sensorData.last_pump.pump === "up" && <span className="pump-up">Up</span>}
