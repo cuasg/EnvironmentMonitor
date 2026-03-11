@@ -209,6 +209,7 @@ const Dashboard = () => {
     pump_duration: 5,
     dev_mode: true,
     sensors_available: true,
+    ph_check_started_at: null,
   });
 
   const [phMonitoring, setPhMonitoring] = useState(false);
@@ -230,6 +231,12 @@ const Dashboard = () => {
   const [selectedTrendsSensors, setSelectedTrendsSensors] = useState(loadPersistedTrendsSensors);
   const [phThresholdLow, setPhThresholdLow] = useState(null);
   const [phThresholdHigh, setPhThresholdHigh] = useState(null);
+  const [nowMs, setNowMs] = useState(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -264,6 +271,7 @@ const Dashboard = () => {
             pump_duration: parseInt(data.pump_settings?.pump_duration ?? 5, 10),
             dev_mode,
             sensors_available,
+            ph_check_started_at: data.ph_check_started_at ?? null,
           });
           setSettingsForOled(data);
           setPhMonitoring(data.pH_monitoring_enabled);
@@ -369,6 +377,7 @@ const Dashboard = () => {
         ? parseInt(data.pump_settings.pump_duration, 10) : prev.pump_duration,
       dev_mode,
       sensors_available,
+      ph_check_started_at: data.ph_check_started_at ?? prev.ph_check_started_at ?? null,
     }));
 
     const now = Date.now();
@@ -471,6 +480,13 @@ const Dashboard = () => {
       hour12: true,
     });
   };
+
+  const isPhCheckActive = (() => {
+    if (!sensorData.ph_check_started_at) return false;
+    const t = new Date(sensorData.ph_check_started_at).getTime();
+    if (Number.isNaN(t)) return false;
+    return nowMs - t < 5000;
+  })();
 
   return (
     <div className="dashboard">
@@ -641,6 +657,11 @@ const Dashboard = () => {
                       )}
                       {sensorData.ph_trend_direction === "flat" && sensorData.last_ph_value !== "N/A" && sensorData.previous_ph_check_value !== "N/A" && (
                         <span className="ph-trend ph-trend-flat">→ Stable</span>
+                      )}
+                      {isPhCheckActive && (
+                        <span className="ph-check-active" title="pH monitoring check in progress">
+                          ⟳ Checking…
+                        </span>
                       )}
                     </p>
                     <p>

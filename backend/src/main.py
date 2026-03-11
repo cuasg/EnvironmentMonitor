@@ -145,6 +145,12 @@ async def ph_monitoring():
 
         existing_settings["last_ph_check"] = now_cst_str
         existing_settings["next_ph_check"] = next_check_time_str
+        # Mark when this check started so the UI can briefly show an
+        # \"active\" indicator for the pH monitoring loop.
+        try:
+            existing_settings["ph_check_started_at"] = datetime.utcnow().isoformat()
+        except Exception:
+            existing_settings["ph_check_started_at"] = None
 
         # ✅ Save updated timestamps and pH history
         await save_settings(existing_settings)

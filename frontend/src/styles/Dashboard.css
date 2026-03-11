@@ -182,6 +182,13 @@
   font-weight: 600;
 }
 
+.ph-check-active {
+  margin-left: 6px;
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
 /* Pump Control tile: minaturized duration + up/down buttons */
 .tile-pump-control {
   display: flex;
