@@ -488,6 +488,8 @@ const Dashboard = () => {
   };
 
   const isPhCheckActive = (() => {
+    // Only show an active check when auto pH monitoring is enabled
+    if (!phMonitoring) return false;
     if (!sensorData.ph_check_started_at) return false;
     const t = new Date(sensorData.ph_check_started_at).getTime();
     if (Number.isNaN(t)) return false;
