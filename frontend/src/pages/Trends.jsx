@@ -13,7 +13,7 @@ import {
 import "/src/styles/Trends.css";
 import { getTrends, getSettings } from "../api";
 import { STORAGE_KEYS } from "../constants";
-import { RANGES, SENSOR_LABELS, LINE_COLORS, formatTrendTime, SENSORS_HIDDEN, loadTrendsRange, saveTrendsRange, computePhYAxisDomain } from "../utils/trendsConfig";
+import { RANGES, SENSOR_LABELS, LINE_COLORS, formatTrendTime, SENSORS_HIDDEN, loadTrendsRange, saveTrendsRange, computePhYAxisDomain, formatYAxisValue } from "../utils/trendsConfig";
 
 function loadPersistedSensors() {
   try {
@@ -160,6 +160,7 @@ const Trends = () => {
               <YAxis
                 stroke="var(--text-muted)"
                 tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+                tickFormatter={formatYAxisValue}
                 domain={yAxisDomain}
               />
               <Tooltip

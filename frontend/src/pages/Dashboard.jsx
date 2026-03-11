@@ -20,7 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { formatNumber, formatTimestamp, formatTimestampWithDate, determineLightStatus } from "../utils/format";
 import { loadOledPreviewSettings, saveOledPreviewSettings } from "../utils/oledPreview";
-import { RANGES, SENSOR_LABELS, LINE_COLORS, formatTrendTime, SENSORS_HIDDEN, loadTrendsRange, saveTrendsRange, computePhYAxisDomain } from "../utils/trendsConfig";
+import { RANGES, SENSOR_LABELS, LINE_COLORS, formatTrendTime, SENSORS_HIDDEN, loadTrendsRange, saveTrendsRange, computePhYAxisDomain, formatYAxisValue } from "../utils/trendsConfig";
 import { STORAGE_KEYS, API_PATHS } from "../constants";
 import OledMirror from "../components/OledMirror";
 
@@ -119,6 +119,7 @@ const SortableGraph = ({ trendsRange, setTrendsRange, chartData, loading, error,
               <YAxis
                 stroke="var(--text-muted)"
                 tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                tickFormatter={formatYAxisValue}
                 domain={yAxisDomain}
               />
               <Tooltip

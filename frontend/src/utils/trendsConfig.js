@@ -118,3 +118,10 @@ export function computePhYAxisDomain(data, lowThreshold, highThreshold, isPhOnly
 
   return [minDomain, maxDomain];
 }
+
+export function formatYAxisValue(value) {
+  if (value == null || Number.isNaN(value)) return "";
+  const n = typeof value === "number" ? value : parseFloat(value);
+  if (Number.isNaN(n)) return "";
+  return n.toFixed(1);
+}
