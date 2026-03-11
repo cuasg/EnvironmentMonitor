@@ -240,31 +240,52 @@ const ControlPanel = () => {
   const savePhRegulationSettings = () => {
     runWithPin(async (token) => {
       try {
-        await updateSettings({
-          pump_settings: {
-            low_pH: parseFloat(settings.low_pH),
-            high_pH: parseFloat(settings.high_pH),
-            pump_duration: parseInt(settings.pump_duration),
-            stabilization_time: parseInt(settings.stabilization_time),
+        await updateSettings(
+          {
+            pump_settings: {
+              low_pH: parseFloat(settings.low_pH),
+              high_pH: parseFloat(settings.high_pH),
+              pump_duration: parseInt(settings.pump_duration, 10),
+              stabilization_time: parseInt(settings.stabilization_time, 10),
+            },
+            sensor_intervals: {
+              ph_check_interval: parseInt(settings.ph_check_interval, 10),
+              sensor_update_interval: parseInt(settings.sensor_update_interval, 10),
+              ph_min_samples: parseInt(settings.ph_min_samples, 10),
+            },
           },
-          sensor_intervals: {
-            ph_check_interval: parseInt(settings.ph_check_interval),
-            sensor_update_interval: parseInt(settings.sensor_update_interval),
-            ph_min_samples: parseInt(settings.ph_min_samples),
-          },
-        }, token);
-        setLastSaved((prev) => ({
-          ...prev,
-          regulation: {
-            low_pH: settings.low_pH,
-            high_pH: settings.high_pH,
-            pump_duration: settings.pump_duration,
-            stabilization_time: settings.stabilization_time,
-            ph_check_interval: settings.ph_check_interval,
-            sensor_update_interval: settings.sensor_update_interval,
-            ph_min_samples: settings.ph_min_samples,
-          },
-        }));
+          token
+        );
+
+        // Reload from backend so UI state and lastSaved exactly match
+        const fresh = await getSettings();
+        if (fresh) {
+          const pump = fresh.pump_settings || {};
+          const intervals = fresh.sensor_intervals || {};
+          const next = {
+            ...settings,
+            low_pH: parseFloat(pump.low_pH ?? settings.low_pH),
+            high_pH: parseFloat(pump.high_pH ?? settings.high_pH),
+            pump_duration: parseInt(pump.pump_duration ?? settings.pump_duration, 10),
+            stabilization_time: parseInt(pump.stabilization_time ?? settings.stabilization_time, 10),
+            ph_check_interval: parseInt(intervals.ph_check_interval ?? settings.ph_check_interval, 10),
+            sensor_update_interval: parseInt(intervals.sensor_update_interval ?? settings.sensor_update_interval, 10),
+            ph_min_samples: parseInt(intervals.ph_min_samples ?? settings.ph_min_samples, 10),
+          };
+          setSettings(next);
+          setLastSaved((prev) => ({
+            ...prev,
+            regulation: {
+              low_pH: next.low_pH,
+              high_pH: next.high_pH,
+              pump_duration: next.pump_duration,
+              stabilization_time: next.stabilization_time,
+              ph_check_interval: next.ph_check_interval,
+              sensor_update_interval: next.sensor_update_interval,
+              ph_min_samples: next.ph_min_samples,
+            },
+          }));
+        }
         showToast("Settings saved.", "success");
       } catch (error) {
         showToast(error.response?.data?.error || "Error updating settings.", "error");
