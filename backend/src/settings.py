@@ -76,8 +76,8 @@ def load_settings():
         parsed_last_ph_check = ensure_datetime(last_ph_check)
         parsed_next_ph_check = ensure_datetime(next_ph_check)
 
-        settings["last_ph_check"] = last_ph_check if parsed_last_ph_check is None else parsed_last_ph_check.strftime("%Y-%m-%d %I:%M %p")
-        settings["next_ph_check"] = next_ph_check if parsed_next_ph_check is None else parsed_next_ph_check.strftime("%Y-%m-%d %I:%M %p")
+        settings["last_ph_check"] = last_ph_check if parsed_last_ph_check is None else parsed_last_ph_check.strftime("%Y-%m-%d %I:%M:%S %p")
+        settings["next_ph_check"] = next_ph_check if parsed_next_ph_check is None else parsed_next_ph_check.strftime("%Y-%m-%d %I:%M:%S %p")
 
         # ✅ Ensure last_pump_activation exists and preserve timestamp
         if "last_pump_activation" not in settings or not isinstance(settings["last_pump_activation"], dict):
@@ -85,7 +85,7 @@ def load_settings():
         else:
             last_pump_timestamp = settings["last_pump_activation"].get("timestamp", "N/A")
             parsed_pump_timestamp = ensure_datetime(last_pump_timestamp)
-            settings["last_pump_activation"]["timestamp"] = last_pump_timestamp if parsed_pump_timestamp is None else parsed_pump_timestamp.strftime("%Y-%m-%d %I:%M %p")
+            settings["last_pump_activation"]["timestamp"] = last_pump_timestamp if parsed_pump_timestamp is None else parsed_pump_timestamp.strftime("%Y-%m-%d %I:%M:%S %p")
 
         # ✅ Merge in critical defaults when missing or malformed
         default_settings = get_default_settings()
@@ -176,15 +176,15 @@ async def save_settings(updated_settings):
         if "last_pump_activation" not in updated_settings or not isinstance(updated_settings["last_pump_activation"], dict):
             current_settings["last_pump_activation"] = preserved_last_pump_activation
 
-        # ✅ Convert datetime values to strings BEFORE saving
+        # ✅ Convert datetime values to strings BEFORE saving (with seconds: HH:MM:SS)
         for timestamp_key in ["last_ph_check", "next_ph_check"]:
             if isinstance(current_settings[timestamp_key], datetime):
-                current_settings[timestamp_key] = current_settings[timestamp_key].strftime("%Y-%m-%d %I:%M %p")
+                current_settings[timestamp_key] = current_settings[timestamp_key].strftime("%Y-%m-%d %I:%M:%S %p")
             elif current_settings[timestamp_key] is None:
                 current_settings[timestamp_key] = "N/A"
 
         if isinstance(current_settings["last_pump_activation"].get("timestamp"), datetime):
-            current_settings["last_pump_activation"]["timestamp"] = current_settings["last_pump_activation"]["timestamp"].strftime("%Y-%m-%d %I:%M %p")
+            current_settings["last_pump_activation"]["timestamp"] = current_settings["last_pump_activation"]["timestamp"].strftime("%Y-%m-%d %I:%M:%S %p")
         elif current_settings["last_pump_activation"]["timestamp"] is None:
             current_settings["last_pump_activation"]["timestamp"] = "N/A"
 

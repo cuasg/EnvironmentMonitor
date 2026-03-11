@@ -41,11 +41,11 @@ def format_time(timestamp):
     """Convert timestamp from JSON to 12-hour format for OLED display."""
     if not timestamp or timestamp == "N/A":
         return "N/A"
-    formats = ["%Y-%m-%d %I:%M %p", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"]
+    formats = ["%Y-%m-%d %I:%M:%S %p", "%Y-%m-%d %I:%M %p", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"]
     for fmt in formats:
         try:
             dt = datetime.strptime(timestamp, fmt)
-            return dt.strftime("%I:%M %p")
+            return dt.strftime("%I:%M:%S %p")
         except ValueError:
             continue
     return "N/A"

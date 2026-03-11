@@ -6,7 +6,7 @@ from grow_logs import log_pump_activation
 PUMP_UP_PIN = 18    # pH Up Pump (GPIO 18)
 PUMP_DOWN_PIN = 27  # pH Down Pump (GPIO 27)
 
-_DISPLAY_TIME_FMT = "%Y-%m-%d %I:%M %p"
+_DISPLAY_TIME_FMT = "%Y-%m-%d %I:%M:%S %p"
 
 _gpio_initialized = False
 

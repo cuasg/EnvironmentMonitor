@@ -183,9 +183,9 @@ async def ph_monitoring():
             # Mark that a check cycle ran but couldn't compute an average yet.
             tz = get_display_tz()
             now_end = datetime.now(tz)
-            now_end_str = now_end.strftime("%Y-%m-%d %I:%M %p")
+            now_end_str = now_end.strftime("%Y-%m-%d %I:%M:%S %p")
             next_check_time = now_end + timedelta(seconds=ph_check_interval)
-            next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
+            next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M:%S %p")
             existing_settings["last_ph_check"] = now_end_str
             existing_settings["next_ph_check"] = next_check_time_str
             try:
@@ -243,10 +243,10 @@ async def ph_monitoring():
         # ✅ Get timestamp at the *end* of the check, after any pump action (in display timezone)
         tz = get_display_tz()
         now_end = datetime.now(tz)
-        now_end_str = now_end.strftime("%Y-%m-%d %I:%M %p")
+        now_end_str = now_end.strftime("%Y-%m-%d %I:%M:%S %p")
 
         next_check_time = now_end + timedelta(seconds=sleep_time)
-        next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
+        next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M:%S %p")
 
         existing_settings["last_ph_check"] = now_end_str
         existing_settings["next_ph_check"] = next_check_time_str

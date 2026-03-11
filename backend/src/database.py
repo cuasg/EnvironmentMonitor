@@ -165,12 +165,14 @@ def enforce_type(value, field_name, value_type):
 
 # ✅ Function to Convert Timestamp to ISO Format
 def convert_to_iso(timestamp, field_name):
-    """Converts timestamp from 12-hour CST format to ISO format for InfluxDB."""
+    """Converts timestamp from 12-hour format to ISO format for InfluxDB."""
     if isinstance(timestamp, str):
-        try:
-            return datetime.datetime.strptime(timestamp, "%Y-%m-%d %I:%M %p").strftime("%Y-%m-%dT%H:%M:%S")
-        except ValueError:
-            return None
+        for fmt in ("%Y-%m-%d %I:%M:%S %p", "%Y-%m-%d %I:%M %p"):
+            try:
+                return datetime.datetime.strptime(timestamp, fmt).strftime("%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                continue
+        return None
     return timestamp  # Return unchanged if already in datetime format
 
 

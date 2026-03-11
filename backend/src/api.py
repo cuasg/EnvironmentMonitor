@@ -108,7 +108,7 @@ def _utc_iso_to_display_tz(utc_iso_str):
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         local = dt.astimezone(get_display_tz())
-        return local.strftime("%Y-%m-%d %I:%M %p")
+        return local.strftime("%Y-%m-%d %I:%M:%S %p")
     except Exception:
         return utc_iso_str
 
@@ -121,11 +121,11 @@ def _prepare_settings_for_ws(settings):
 
     for key in ("last_ph_check", "next_ph_check"):
         if key in out and isinstance(out[key], datetime):
-            out[key] = out[key].strftime("%Y-%m-%d %I:%M %p")
+            out[key] = out[key].strftime("%Y-%m-%d %I:%M:%S %p")
     if "last_pump_activation" in out and isinstance(out["last_pump_activation"], dict):
         ts = out["last_pump_activation"].get("timestamp")
         if isinstance(ts, datetime):
-            out["last_pump_activation"]["timestamp"] = ts.strftime("%Y-%m-%d %I:%M %p")
+            out["last_pump_activation"]["timestamp"] = ts.strftime("%Y-%m-%d %I:%M:%S %p")
 
     # Convert UTC-stored check timestamps to display timezone so all times are consistent
     for key in ("ph_check_started_at", "ph_check_ended_at"):
@@ -338,12 +338,20 @@ async def get_health():
                 result["sensors_recent"]["details"] = "No recent pH check recorded"
             else:
                 try:
-                    dt = datetime.strptime(last_ph, "%Y-%m-%d %I:%M %p")
-                    interval_sec = (settings.get("sensor_intervals") or {}).get("ph_check_interval", 60)
-                    max_age_sec = max(2 * interval_sec, 15 * 60)
-                    if (datetime.now() - dt).total_seconds() > max_age_sec:
-                        result["sensors_recent"]["ok"] = False
-                        result["sensors_recent"]["details"] = "Last pH check is older than expected"
+                    for fmt in ("%Y-%m-%d %I:%M:%S %p", "%Y-%m-%d %I:%M %p"):
+                        try:
+                            dt = datetime.strptime(last_ph, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        dt = None
+                    if dt is not None:
+                        interval_sec = (settings.get("sensor_intervals") or {}).get("ph_check_interval", 60)
+                        max_age_sec = max(2 * interval_sec, 15 * 60)
+                        if (datetime.now() - dt).total_seconds() > max_age_sec:
+                            result["sensors_recent"]["ok"] = False
+                            result["sensors_recent"]["details"] = "Last pH check is older than expected"
                 except (ValueError, TypeError):
                     pass
     except Exception as e:
