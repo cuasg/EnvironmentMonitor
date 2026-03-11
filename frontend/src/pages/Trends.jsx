@@ -13,7 +13,7 @@ import {
 import "/src/styles/Trends.css";
 import { getTrends, getSettings } from "../api";
 import { STORAGE_KEYS } from "../constants";
-import { RANGES, SENSOR_LABELS, LINE_COLORS, formatTrendTime, SENSORS_HIDDEN, loadTrendsRange, saveTrendsRange } from "../utils/trendsConfig";
+import { RANGES, SENSOR_LABELS, LINE_COLORS, formatTrendTime, SENSORS_HIDDEN, loadTrendsRange, saveTrendsRange, computePhYAxisDomain } from "../utils/trendsConfig";
 
 function loadPersistedSensors() {
   try {
@@ -83,6 +83,16 @@ const Trends = () => {
 
   const displayData = (chartData || []).map((row) => ({ ...row, time: row.time }));
 
+  const isPhOnly =
+    selectedSensors.length === 1 && selectedSensors[0] === "pH_value";
+
+  const yAxisDomain = computePhYAxisDomain(
+    displayData,
+    phThresholdLow,
+    phThresholdHigh,
+    isPhOnly
+  );
+
   return (
     <div className="trends-page">
       <h1 className="trends-title">Trends</h1>
@@ -150,7 +160,7 @@ const Trends = () => {
               <YAxis
                 stroke="var(--text-muted)"
                 tick={{ fill: "var(--text-muted)", fontSize: 12 }}
-                domain={["auto", "auto"]}
+                domain={yAxisDomain}
               />
               <Tooltip
                 contentStyle={{

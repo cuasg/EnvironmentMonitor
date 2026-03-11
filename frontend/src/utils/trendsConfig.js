@@ -61,8 +61,60 @@ export function formatTrendTime(value) {
   if (!value) return "";
   try {
     const d = new Date(value);
-    return isNaN(d.getTime()) ? value : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (isNaN(d.getTime())) return value;
+
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    // When the point is more than 24 hours old, include the day so it is
+    // easier to see when something happened on longer ranges.
+    if (diffHours > 24) {
+      return d.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   } catch {
     return value;
   }
+}
+
+export function computePhYAxisDomain(data, lowThreshold, highThreshold, isPhOnly) {
+  if (!isPhOnly || lowThreshold == null || highThreshold == null) {
+    return ["auto", "auto"];
+  }
+
+  let dataMin = Infinity;
+  let dataMax = -Infinity;
+
+  (data || []).forEach((row) => {
+    const v = row?.pH_value;
+    if (typeof v === "number" && !Number.isNaN(v)) {
+      if (v < dataMin) dataMin = v;
+      if (v > dataMax) dataMax = v;
+    }
+  });
+
+  if (!Number.isFinite(dataMin) || !Number.isFinite(dataMax)) {
+    dataMin = lowThreshold;
+    dataMax = highThreshold;
+  }
+
+  let minDomain = Math.min(dataMin, lowThreshold) - 2;
+  let maxDomain = Math.max(dataMax, highThreshold) + 2;
+
+  if (minDomain < 0) minDomain = 0;
+  if (maxDomain <= minDomain) maxDomain = minDomain + 1;
+
+  return [minDomain, maxDomain];
 }

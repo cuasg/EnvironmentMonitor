@@ -8,7 +8,7 @@ from settings import load_settings, save_settings
 logger = logging.getLogger(__name__)
 from sensors import read_all_sensors, read_ph_sensor
 from pumps import activate_pump
-from ph_buffer import add_reading, get_average
+from ph_buffer import add_reading, get_average, get_last_n_average
 from database import log_sensor_data
 from datetime import datetime, timedelta
 
@@ -56,13 +56,15 @@ async def ph_monitoring():
 
         sensor_intervals = settings.get("sensor_intervals") or {}
         ph_check_interval = sensor_intervals.get("ph_check_interval", 60)
-        ph_window_minutes = sensor_intervals.get("ph_average_window_minutes", 5)
         low_pH = settings["pump_settings"].get("low_pH", 5.7)
         high_pH = settings["pump_settings"].get("high_pH", 6.3)
         pump_duration = settings["pump_settings"].get("pump_duration", 5)
         stabilization_time = settings["pump_settings"].get("stabilization_time", 30)
 
-        avg_ph_value = get_average(minutes=ph_window_minutes, min_readings=6)
+        # Prefer an average of the most recent 30 continuous-cycle readings
+        # so that scheduled checks are based on a stable value instead of
+        # a single potentially noisy sample.
+        avg_ph_value = get_last_n_average(count=30, min_readings=10)
         if avg_ph_value is None:
             avg_ph_voltage, avg_ph_value = await read_ph_sensor()
         else:
@@ -89,12 +91,29 @@ async def ph_monitoring():
         next_check_time = now_cst + timedelta(seconds=sleep_time)
         next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
 
-        # Ensure timestamps persist correctly
+        # Ensure timestamps and pH history persist correctly
         existing_settings = load_settings()
+
+        # Track last/previous pH check values and a simple trend direction
+        previous_ph_check_value = existing_settings.get("last_ph_value")
+        existing_settings["previous_ph_check_value"] = previous_ph_check_value
+        existing_settings["last_ph_value"] = avg_ph_value
+
+        trend = "flat"
+        try:
+            if isinstance(previous_ph_check_value, (int, float)) and previous_ph_check_value is not None:
+                if avg_ph_value > previous_ph_check_value:
+                    trend = "up"
+                elif avg_ph_value < previous_ph_check_value:
+                    trend = "down"
+        except Exception:
+            trend = "flat"
+        existing_settings["ph_trend_direction"] = trend
+
         existing_settings["last_ph_check"] = now_cst_str
         existing_settings["next_ph_check"] = next_check_time_str
 
-        # ✅ Save updated timestamps
+        # ✅ Save updated timestamps and pH history
         await save_settings(existing_settings)
         await asyncio.sleep(sleep_time)
 

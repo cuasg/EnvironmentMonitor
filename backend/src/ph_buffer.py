@@ -25,3 +25,26 @@ def get_average(minutes: float = 5.0, min_readings: int = 6) -> float | None:
     if len(recent) < min_readings:
         return None
     return round(sum(recent) / len(recent), 1)
+
+
+def get_last_n_average(count: int = 30, min_readings: int | None = None) -> float | None:
+    """
+    Return average pH over the last N readings from the rolling buffer.
+    Intended for scheduled pH checks that should use a block of recent
+    continuous-cycle readings instead of a single sample.
+    """
+    if count <= 0:
+        return None
+    # Default minimum: at least half of the requested samples
+    if min_readings is None:
+        min_readings = max(1, count // 2)
+
+    if not _buffer:
+        return None
+
+    # Take the latest N readings regardless of exact timestamps
+    recent_values = [v for _, v in list(_buffer)[-count:]]
+    if len(recent_values) < min_readings:
+        return None
+
+    return round(sum(recent_values) / len(recent_values), 1)

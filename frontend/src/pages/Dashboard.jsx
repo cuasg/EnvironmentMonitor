@@ -20,7 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { formatNumber, formatTimestamp, formatTimestampWithDate, determineLightStatus } from "../utils/format";
 import { loadOledPreviewSettings, saveOledPreviewSettings } from "../utils/oledPreview";
-import { RANGES, SENSOR_LABELS, LINE_COLORS, formatTrendTime, SENSORS_HIDDEN, loadTrendsRange, saveTrendsRange } from "../utils/trendsConfig";
+import { RANGES, SENSOR_LABELS, LINE_COLORS, formatTrendTime, SENSORS_HIDDEN, loadTrendsRange, saveTrendsRange, computePhYAxisDomain } from "../utils/trendsConfig";
 import { STORAGE_KEYS, API_PATHS } from "../constants";
 import OledMirror from "../components/OledMirror";
 
@@ -72,6 +72,16 @@ const SortableGraph = ({ trendsRange, setTrendsRange, chartData, loading, error,
 
   const displayData = (chartData || []).map((row) => ({ ...row, time: row.time }));
 
+  const isPhOnly =
+    selectedSensors.length === 1 && selectedSensors[0] === "pH_value";
+
+  const yAxisDomain = computePhYAxisDomain(
+    displayData,
+    phThresholdLow,
+    phThresholdHigh,
+    isPhOnly
+  );
+
   return (
     <div ref={setNodeRef} {...attributes} {...listeners} className="tile tile-dashboard-graph" style={style}>
       <div className="dashboard-graph-header">
@@ -109,7 +119,7 @@ const SortableGraph = ({ trendsRange, setTrendsRange, chartData, loading, error,
               <YAxis
                 stroke="var(--text-muted)"
                 tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                domain={["auto", "auto"]}
+                domain={yAxisDomain}
               />
               <Tooltip
                 contentStyle={{
@@ -189,6 +199,9 @@ const Dashboard = () => {
     water_temp: "N/A",
     last_ph_check: "N/A",
     next_ph_check: "N/A",
+    last_ph_value: "N/A",
+    previous_ph_check_value: "N/A",
+    ph_trend_direction: "flat",
     last_pump: { pump: "None", timestampRaw: "N/A" },
     low_pH: 5.7,
     high_pH: 6.3,
@@ -238,6 +251,9 @@ const Dashboard = () => {
             water_temp: formatNumber(data.water_temperature_f),
             last_ph_check: formatTimestamp(data.last_ph_check),
             next_ph_check: formatTimestamp(data.next_ph_check),
+            last_ph_value: formatNumber(data.last_ph_value, 2),
+            previous_ph_check_value: formatNumber(data.previous_ph_check_value, 2),
+            ph_trend_direction: data.ph_trend_direction || "flat",
             last_pump: {
               pump: data.last_pump_activation?.pump ?? "None",
               timestampRaw: data.last_pump_activation?.timestamp ?? "N/A",
@@ -339,6 +355,9 @@ const Dashboard = () => {
       water_temp: water,
       last_ph_check: formatTimestamp(data.last_ph_check),
       next_ph_check: formatTimestamp(data.next_ph_check),
+      last_ph_value: formatNumber(data.last_ph_value, 2),
+      previous_ph_check_value: formatNumber(data.previous_ph_check_value, 2),
+      ph_trend_direction: data.ph_trend_direction || prev.ph_trend_direction || "flat",
       last_pump: {
         pump: data.last_pump_activation?.pump ?? "None",
         timestampRaw: data.last_pump_activation?.timestamp ?? "N/A",
@@ -607,7 +626,22 @@ const Dashboard = () => {
                   <>
                     <h3>pH History</h3>
                     <p>Next Check: {formatTimestamp(sensorData.next_ph_check)}</p>
-                    <p>Last Check: {formatTimestamp(sensorData.last_ph_check)}</p>
+                    <p>
+                      Last Check: {formatTimestamp(sensorData.last_ph_check)}
+                      {sensorData.last_ph_value !== "N/A" && (
+                        <> — pH {sensorData.last_ph_value}</>
+                      )}
+                      {" "}
+                      {sensorData.ph_trend_direction === "up" && (
+                        <span className="ph-trend ph-trend-up">↑ Rising</span>
+                      )}
+                      {sensorData.ph_trend_direction === "down" && (
+                        <span className="ph-trend ph-trend-down">↓ Falling</span>
+                      )}
+                      {sensorData.ph_trend_direction === "flat" && sensorData.last_ph_value !== "N/A" && sensorData.previous_ph_check_value !== "N/A" && (
+                        <span className="ph-trend ph-trend-flat">→ Stable</span>
+                      )}
+                    </p>
                     <p>
                       Last Pump:{" "}
                       {sensorData.last_pump.pump === "up" && <span className="pump-up">Up</span>}
