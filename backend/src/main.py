@@ -39,12 +39,37 @@ async def continuous_monitoring():
         _handle_dev_mode_transition(settings)
         sensor_intervals = settings.get("sensor_intervals") or {}
         sensor_update_interval = sensor_intervals.get("sensor_update_interval", 60)
+        ph_min_samples = sensor_intervals.get("ph_min_samples", 10)
+        try:
+            ph_min_samples = int(ph_min_samples)
+        except (TypeError, ValueError):
+            ph_min_samples = 10
+        if ph_min_samples < 1:
+            ph_min_samples = 1
 
         updated_sensor_data = await read_all_sensors()
         if updated_sensor_data is None:
             logger.debug("Sensor read failed; retrying next interval")
         elif updated_sensor_data.get("pH_value") is not None:
+            # Every fresh pH reading contributes to the rolling buffer used by
+            # the pH monitoring loop. Update the live "reads collected" counter
+            # so the dashboard can show progress toward the configured minimum
+            # even before a scheduled check runs.
             add_reading(updated_sensor_data["pH_value"])
+            try:
+                total_samples_in_buffer = buffer_size()
+            except Exception:
+                total_samples_in_buffer = 0
+            samples_required = ph_min_samples
+            samples_used = min(total_samples_in_buffer, samples_required)
+            try:
+                await save_settings({
+                    "ph_samples_available": samples_used,
+                    "ph_samples_required": samples_required,
+                })
+            except Exception:
+                # Don't let a settings write failure break continuous monitoring
+                logger.exception("Failed to update ph_samples_* in settings")
 
         current_time = time.time()
         if current_time - last_db_update >= sensor_update_interval:
