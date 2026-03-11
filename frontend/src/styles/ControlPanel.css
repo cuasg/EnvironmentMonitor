@@ -277,6 +277,32 @@ button:disabled {
   opacity: 0.7;
 }
 
+.control-panel-tiles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg, 24px);
+}
+
+.section-tile {
+  position: relative;
+}
+
+.section-tile-handle {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: grab;
+  font-size: 0.875rem;
+  padding: 0;
+}
+
+.section-tile-handle:active {
+  cursor: grabbing;
+}
+
 @media (max-width: 600px) {
   .control-panel {
     margin: var(--space-md, 16px);

@@ -31,7 +31,15 @@ const Tile = ({ id, children }) => {
   };
 
   return (
-    <div ref={setNodeRef} {...attributes} {...listeners} className="section-tile" style={style}>
+    <div ref={setNodeRef} {...attributes} className="section-tile" style={style}>
+      <button
+        type="button"
+        className="section-tile-handle"
+        {...listeners}
+        aria-label="Reorder section"
+      >
+        ⋮⋮
+      </button>
       {children}
     </div>
   );
