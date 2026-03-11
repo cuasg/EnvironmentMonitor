@@ -58,3 +58,14 @@ def clear_buffer() -> None:
 def buffer_size() -> int:
     """Return how many pH samples are currently stored in the buffer."""
     return len(_buffer)
+
+
+def latest_age_seconds() -> float | None:
+    """
+    Return the age in seconds of the most recent pH reading in the buffer.
+    If the buffer is empty, returns None.
+    """
+    if not _buffer:
+        return None
+    latest_ts, _ = _buffer[-1]
+    return time() - latest_ts

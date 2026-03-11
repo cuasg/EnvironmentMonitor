@@ -8,7 +8,7 @@ from settings import load_settings, save_settings
 logger = logging.getLogger(__name__)
 from sensors import read_all_sensors, read_ph_sensor
 from pumps import activate_pump
-from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer, buffer_size
+from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer, buffer_size, latest_age_seconds
 from database import log_sensor_data
 from datetime import datetime, timedelta
 
@@ -76,12 +76,17 @@ async def ph_monitoring():
         sensor_intervals = settings.get("sensor_intervals") or {}
         ph_check_interval = sensor_intervals.get("ph_check_interval", 60)
         ph_min_samples = sensor_intervals.get("ph_min_samples", 10)
+        sensor_update_interval = sensor_intervals.get("sensor_update_interval", 60)
         try:
             ph_min_samples = int(ph_min_samples)
         except (TypeError, ValueError):
             ph_min_samples = 10
         if ph_min_samples < 1:
             ph_min_samples = 1
+        try:
+            sensor_update_interval = int(sensor_update_interval)
+        except (TypeError, ValueError):
+            sensor_update_interval = 60
 
         # Be defensive: pump_settings might be missing or malformed in settings.json
         pump_settings = settings.get("pump_settings") or {}
@@ -98,14 +103,50 @@ async def ph_monitoring():
         # a single potentially noisy sample. The minimum number of samples
         # required can be tuned via sensor_intervals.ph_min_samples.
         avg_ph_value = get_last_n_average(count=30, min_readings=ph_min_samples)
-        if avg_ph_value is None:
-            avg_ph_voltage, avg_ph_value = await read_ph_sensor()
-        else:
-            avg_ph_voltage = settings.get("ph_voltage")  # Latest from continuous loop
 
+        # Track how many buffered samples we currently have versus the target
+        try:
+            total_samples_in_buffer = buffer_size()
+        except Exception:
+            total_samples_in_buffer = 0
+
+        # Also ensure the buffer is "fresh" — if the latest sample is too old,
+        # we treat the average as unavailable so we never act on stale data.
+        try:
+            age_seconds = latest_age_seconds()
+        except Exception:
+            age_seconds = None
+        max_fresh_age = max(2 * sensor_update_interval, 15 * 60)  # reuse health-check style threshold
+        if age_seconds is None or age_seconds > max_fresh_age:
+            avg_ph_value = None
+
+        # If we don't have enough *fresh* samples to compute a stable average,
+        # we skip any pump action for this cycle and treat it as "average or bust".
         if avg_ph_value is None:
-            await asyncio.sleep(10)
+            existing_settings = load_settings()
+            samples_required = ph_min_samples
+            samples_used = min(total_samples_in_buffer, samples_required)
+            existing_settings["ph_samples_available"] = samples_used
+            existing_settings["ph_samples_required"] = samples_required
+
+            # Mark that a check cycle ran but couldn't compute an average yet.
+            now_cst_end = datetime.now(CST)
+            now_cst_end_str = now_cst_end.strftime("%Y-%m-%d %I:%M %p")
+            next_check_time = now_cst_end + timedelta(seconds=ph_check_interval)
+            next_check_time_str = next_check_time.strftime("%Y-%m-%d %I:%M %p")
+            existing_settings["last_ph_check"] = now_cst_end_str
+            existing_settings["next_ph_check"] = next_check_time_str
+            try:
+                existing_settings["ph_check_started_at"] = datetime.utcnow().isoformat()
+            except Exception:
+                existing_settings["ph_check_started_at"] = None
+
+            await save_settings(existing_settings)
+            await asyncio.sleep(ph_check_interval)
             continue
+
+        # At this point we have a valid averaged pH value from the buffer only.
+        avg_ph_voltage = settings.get("ph_voltage")  # Latest from continuous loop
 
         # ✅ Determine next check's required sleep duration based on pH
         if avg_ph_value < low_pH:
@@ -136,7 +177,7 @@ async def ph_monitoring():
             trend = "flat"
         existing_settings["ph_trend_direction"] = trend
 
-        # Track how many samples were available vs. the configured minimum
+        # Track how many buffered samples were available vs. the configured minimum
         try:
             total_samples_in_buffer = buffer_size()
         except Exception:
