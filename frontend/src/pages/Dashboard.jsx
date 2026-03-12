@@ -199,6 +199,7 @@ const Dashboard = () => {
     air_temp: "N/A",
     water_temp: "N/A",
     last_ph_check: "N/A",
+    last_ph_check_start: "N/A",
     next_ph_check: "N/A",
     last_ph_value: "N/A",
     previous_ph_check_value: "N/A",
@@ -262,6 +263,7 @@ const Dashboard = () => {
             air_temp: formatNumber(data.air_temperature_f),
             water_temp: formatNumber(data.water_temperature_f),
             last_ph_check: formatTimestamp(data.last_ph_check),
+            last_ph_check_start: formatTimestampWithDate(data.last_ph_check_start),
             next_ph_check: formatTimestamp(data.next_ph_check),
             last_ph_value: formatNumber(data.last_ph_value, 2),
             previous_ph_check_value: formatNumber(data.previous_ph_check_value, 2),
@@ -371,6 +373,9 @@ const Dashboard = () => {
       air_temp: air,
       water_temp: water,
       last_ph_check: formatTimestamp(data.last_ph_check),
+      last_ph_check_start: data.last_ph_check_start
+        ? formatTimestampWithDate(data.last_ph_check_start)
+        : prev.last_ph_check_start,
       next_ph_check: formatTimestamp(data.next_ph_check),
       last_ph_value: formatNumber(data.last_ph_value, 2),
       previous_ph_check_value: formatNumber(data.previous_ph_check_value, 2),
@@ -653,13 +658,13 @@ const Dashboard = () => {
                   <>
                     <h3>pH History</h3>
                     <p>
-                      Check Start:{" "}
-                      {sensorData.ph_check_started_at
-                        ? formatTimestampWithDate(sensorData.ph_check_started_at)
+                      Last Check Start:{" "}
+                      {sensorData.last_ph_check_start
+                        ? sensorData.last_ph_check_start
                         : "N/A"}
                     </p>
                     <p>
-                      Check End:{" "}
+                      Last Check End:{" "}
                       {sensorData.ph_check_ended_at
                         ? formatTimestampWithDate(sensorData.ph_check_ended_at)
                         : formatTimestamp(sensorData.last_ph_check)}
