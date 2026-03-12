@@ -39,6 +39,14 @@
   border-bottom: 1px solid var(--border);
 }
 
+.health-row-clickable {
+  cursor: pointer;
+}
+
+.health-row-clickable:hover .health-label {
+  color: var(--accent);
+}
+
 .health-indicator {
   flex-shrink: 0;
   width: 14px;
@@ -62,12 +70,42 @@
   min-width: 140px;
 }
 
+.health-label-extra {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-left: 0.5rem;
+}
+
 .health-detail {
   font-size: 0.875rem;
   color: var(--text-muted);
   margin-left: auto;
   text-align: right;
   max-width: 240px;
+}
+
+.health-ph-checks-detail {
+  margin: -0.25rem 0 var(--space-sm) 2rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.health-ph-checks-detail table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.health-ph-checks-detail th,
+.health-ph-checks-detail td {
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.health-ph-checks-detail th {
+  font-weight: 500;
+  color: var(--text);
 }
 
 .health-refresh {
