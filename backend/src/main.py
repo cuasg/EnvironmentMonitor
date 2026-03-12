@@ -154,14 +154,21 @@ async def ph_monitoring():
         except Exception:
             total_samples_in_buffer = 0
 
-        # Also ensure the buffer is "fresh" — if the latest sample is too old,
-        # we treat the average as unavailable so we never act on stale data.
+        # Decide whether data is stale or just insufficient, so we can log
+        # a more precise reason for skipped checks.
         try:
             age_seconds = latest_age_seconds()
         except Exception:
             age_seconds = None
-        max_fresh_age = max(2 * sensor_update_interval, 15 * 60)  # reuse health-check style threshold
-        if age_seconds is None or age_seconds > max_fresh_age:
+        # Consider data fresh for longer to avoid over-triggering stale_data.
+        # Allow up to 4x the sensor_update_interval, with a minimum of 30 minutes.
+        max_fresh_age = max(4 * sensor_update_interval, 30 * 60)
+        stale_data = age_seconds is None or age_seconds > max_fresh_age
+        insufficient_samples = total_samples_in_buffer < ph_min_samples
+
+        # Also ensure the buffer is "fresh" — if the latest sample is too old,
+        # we treat the average as unavailable so we never act on stale data.
+        if stale_data:
             avg_ph_value = None
 
         # If we don't have enough *fresh* samples to compute a stable average,
@@ -190,13 +197,19 @@ async def ph_monitoring():
             # Log this attempted check for the health page (insufficient / stale data).
             try:
                 readings = get_last_n_values(count=30)
+                if stale_data:
+                    reason = "stale_data"
+                elif insufficient_samples:
+                    reason = "insufficient_samples"
+                else:
+                    reason = "unknown"
                 log_ph_check(
                     ts=now_end,
                     readings=readings,
                     avg_value=None,
                     samples_required=samples_required,
                     samples_available=samples_used,
-                    reason="insufficient_or_stale",
+                    reason=reason,
                 )
             except Exception:
                 pass
