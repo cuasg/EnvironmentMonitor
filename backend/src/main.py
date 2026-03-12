@@ -66,24 +66,9 @@ async def continuous_monitoring():
             logger.debug("Sensor read failed; retrying next interval")
         elif updated_sensor_data.get("pH_value") is not None:
             # Every fresh pH reading contributes to the rolling buffer used by
-            # the pH monitoring loop. Update the live "reads collected" counter
-            # so the dashboard can show progress toward the configured minimum
-            # even before a scheduled check runs.
+            # the pH monitoring loop, but we keep this purely in memory to
+            # avoid hammering the SD card with frequent settings writes.
             add_reading(updated_sensor_data["pH_value"])
-            try:
-                total_samples_in_buffer = buffer_size()
-            except Exception:
-                total_samples_in_buffer = 0
-            samples_required = ph_min_samples
-            samples_used = min(total_samples_in_buffer, samples_required)
-            try:
-                await save_settings({
-                    "ph_samples_available": samples_used,
-                    "ph_samples_required": samples_required,
-                })
-            except Exception:
-                # Don't let a settings write failure break continuous monitoring
-                logger.exception("Failed to update ph_samples_* in settings")
 
         current_time = time.time()
         if current_time - last_db_update >= sensor_update_interval:
