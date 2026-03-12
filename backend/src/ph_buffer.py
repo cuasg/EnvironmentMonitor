@@ -69,3 +69,14 @@ def latest_age_seconds() -> float | None:
         return None
     latest_ts, _ = _buffer[-1]
     return time() - latest_ts
+
+
+def get_last_n_values(count: int = 30) -> list[float]:
+    """
+    Return the raw pH values for the last N readings in the rolling buffer.
+    Intended for logging/debugging so we can see exactly which samples were
+    used (or attempted to be used) for an averaged pH check.
+    """
+    if count <= 0 or not _buffer:
+        return []
+    return [v for _, v in list(_buffer)[-count:]]

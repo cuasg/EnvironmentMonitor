@@ -12,6 +12,7 @@ from pumps import activate_pump, start_pump_then_return
 from main import main  # ✅ Import the continuous monitoring loop
 from oled_display import async_display_oled  # ✅ Import OLED function
 from database import query_trends, TRENDS_AVAILABLE_FIELDS, check_influx_connection, get_influx_connection_status, get_influx_activity
+from ph_check_log import get_ph_check_log
 from oled_renderer import get_current_display_state
 from config import CORS_ALLOW_ORIGIN_LIST, API_HOST, API_PORT
 from datetime import datetime, timezone
@@ -356,6 +357,12 @@ async def get_health():
                     pass
     except Exception as e:
         result["sensors_recent"] = {"ok": False, "last_ph_check": None, "details": str(e), "dev_mode": False, "sensors_available": False, "sensors_unavailable_reason": None}
+
+    # pH monitoring checks log (lightweight, in-memory only)
+    try:
+        result["ph_checks"] = get_ph_check_log()
+    except Exception as e:
+        result["ph_checks"] = {"ok": False, "error": str(e)}
 
     # Settings file
     try:

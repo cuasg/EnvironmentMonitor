@@ -7,8 +7,9 @@ from settings import load_settings, save_settings, get_display_tz
 logger = logging.getLogger(__name__)
 from sensors import read_all_sensors, read_ph_sensor
 from pumps import activate_pump
-from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer, buffer_size, latest_age_seconds
+from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer, buffer_size, latest_age_seconds, get_last_n_values
 from database import log_sensor_data
+from ph_check_log import log_ph_check
 
 
 # Display timezone comes from settings (get_display_tz()); no hardcoded CST
@@ -201,6 +202,20 @@ async def ph_monitoring():
                 existing_settings["ph_check_ended_at"] = None
             existing_settings["ph_check_active"] = False
 
+            # Log this attempted check for the health page (insufficient / stale data).
+            try:
+                readings = get_last_n_values(count=30)
+                log_ph_check(
+                    ts=now_end,
+                    readings=readings,
+                    avg_value=None,
+                    samples_required=samples_required,
+                    samples_available=samples_used,
+                    reason="insufficient_or_stale",
+                )
+            except Exception:
+                pass
+
             await save_settings(existing_settings)
             await _sleep_until_disabled_or_elapsed(ph_check_interval)
             continue
@@ -266,6 +281,20 @@ async def ph_monitoring():
         except Exception:
             existing_settings["ph_check_ended_at"] = None
         existing_settings["ph_check_active"] = False
+
+        # Log this successful averaged check for the health page.
+        try:
+            readings = get_last_n_values(count=30)
+            log_ph_check(
+                ts=now_end,
+                readings=readings,
+                avg_value=avg_ph_value,
+                samples_required=samples_required,
+                samples_available=samples_used,
+                reason="ok",
+            )
+        except Exception:
+            pass
 
         # ✅ Save updated timestamps and pH history
         await save_settings(existing_settings)
