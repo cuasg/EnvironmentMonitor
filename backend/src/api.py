@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import subprocess
-from quart import Quart, websocket, request, jsonify
+from quart import Quart, Blueprint, websocket, request, jsonify
 from quart_cors import cors
 from settings import load_settings, save_settings, get_display_tz
 from pumps import activate_pump, start_pump_then_return
@@ -28,6 +28,8 @@ from pin_auth import (
 )
 
 app = Quart(__name__)
+# All API and WebSocket routes live under /api so NPM can proxy /api (and /api/ws) to the backend.
+api_bp = Blueprint("api", __name__, url_prefix="/api")
 logger = logging.getLogger(__name__)
 
 # WebSocket broadcast interval (seconds).
@@ -55,6 +57,7 @@ def require_pin_session():
 
 # CORS: list of origins + Tailscale regex (quart_cors expects list/Pattern, not callable)
 app = cors(app, allow_origin=CORS_ALLOW_ORIGIN_LIST)
+app.register_blueprint(api_bp)
 
 # ✅ WebSocket Clients List (Changed to a List Instead of a Set)
 connected_clients = []
@@ -73,7 +76,7 @@ async def start_services():
     asyncio.create_task(websocket_broadcast_loop())
 
 # ✅ WebSocket Route for Live Settings Updates
-@app.websocket("/ws/settings")
+@api_bp.websocket("/ws/settings")
 async def settings_ws():
     """Handles WebSocket connections and keeps them alive."""
     global connected_clients
@@ -165,7 +168,7 @@ async def websocket_broadcast_loop():
         await asyncio.sleep(WS_BROADCAST_INTERVAL)
 
 # ✅ REST API to Fetch Settings (strip pin_auth, convert times to display TZ)
-@app.route("/settings", methods=["GET"])
+@api_bp.route("/settings", methods=["GET"])
 async def get_settings():
     settings = load_settings()
     data = _prepare_settings_for_ws(settings)
@@ -176,7 +179,7 @@ async def get_settings():
 
 
 # ✅ PIN Auth Endpoints
-@app.route("/auth/status", methods=["GET"])
+@api_bp.route("/auth/status", methods=["GET"])
 async def auth_status():
     """Return pinConfigured and, if valid session token sent, authenticated + expiresAt."""
     token = request.headers.get(PIN_SESSION_HEADER)
@@ -187,7 +190,7 @@ async def auth_status():
     return jsonify(result)
 
 
-@app.route("/auth/setup", methods=["POST"])
+@api_bp.route("/auth/setup", methods=["POST"])
 async def auth_setup():
     """First-time PIN setup. Body: { "pin": "1234" }. Only allowed when PIN not configured."""
     if is_pin_configured():
@@ -205,7 +208,7 @@ async def auth_setup():
     }), 201
 
 
-@app.route("/auth/verify", methods=["POST"])
+@api_bp.route("/auth/verify", methods=["POST"])
 async def auth_verify():
     """Verify PIN and start session. Body: { "pin": "1234" }."""
     if not is_pin_configured():
@@ -223,7 +226,7 @@ async def auth_verify():
     })
 
 
-@app.route("/auth/change-pin", methods=["POST"])
+@api_bp.route("/auth/change-pin", methods=["POST"])
 async def auth_change_pin():
     """Change PIN. Requires valid session. Body: { "currentPin": "1234", "newPin": "5678" }."""
     err = require_pin_session()
@@ -243,7 +246,7 @@ async def auth_change_pin():
 RANGE_MINUTES = {"3h": 180, "6h": 360, "12h": 720, "24h": 1440, "72h": 4320, "7d": 10080}
 
 
-@app.route("/trends", methods=["GET"])
+@api_bp.route("/trends", methods=["GET"])
 async def get_trends():
     """Query InfluxDB for sensor trends. Params: range=3h|6h|12h|24h|72h|7d, sensors=pH_value,ppm_500,..."""
     range_param = request.args.get("range", "24h")
@@ -254,7 +257,7 @@ async def get_trends():
     return jsonify({"data": data, "sensors": TRENDS_AVAILABLE_FIELDS})
 
 
-@app.route("/oled/config", methods=["GET"])
+@api_bp.route("/oled/config", methods=["GET"])
 async def get_oled_config():
     """Get OLED page configuration."""
     settings = load_settings()
@@ -265,7 +268,7 @@ async def get_oled_config():
     return jsonify(oled_config)
 
 
-@app.route("/oled/config", methods=["POST"])
+@api_bp.route("/oled/config", methods=["POST"])
 async def update_oled_config():
     """Update OLED page configuration."""
     data = await request.get_json()
@@ -276,7 +279,7 @@ async def update_oled_config():
     return jsonify({"message": "OLED config updated successfully!"})
 
 
-@app.route("/oled/display", methods=["GET"])
+@api_bp.route("/oled/display", methods=["GET"])
 async def get_oled_display():
     """Get current OLED display state for mirroring."""
     state = get_current_display_state()
@@ -291,7 +294,7 @@ async def get_oled_display():
     return jsonify(state)
 
 
-@app.route("/influx/status", methods=["GET"])
+@api_bp.route("/influx/status", methods=["GET"])
 async def get_influx_status():
     """Get InfluxDB connection status and recent activity."""
     status = get_influx_connection_status()
@@ -305,7 +308,7 @@ async def get_influx_status():
     })
 
 
-@app.route("/health", methods=["GET"])
+@api_bp.route("/health", methods=["GET"])
 async def get_health():
     """Health checks for status page: API, Influx, sensors recent, settings file, grow logs file. No auth required."""
     result = {"api": "ok"}
@@ -382,7 +385,7 @@ async def get_health():
     return jsonify(result)
 
 
-@app.route("/influx/config", methods=["GET"])
+@api_bp.route("/influx/config", methods=["GET"])
 async def get_influx_config():
     """Get InfluxDB config for UI (token masked). Uses settings.influx_config with env fallback."""
     from config import INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET
@@ -402,7 +405,7 @@ async def get_influx_config():
     })
 
 
-@app.route("/influx/config", methods=["POST"])
+@api_bp.route("/influx/config", methods=["POST"])
 async def save_influx_config():
     """Save InfluxDB config (PIN required when PIN is configured)."""
     err = require_pin_session()
@@ -429,13 +432,13 @@ async def save_influx_config():
 
 
 # ✅ Grow Logs API Endpoints
-@app.route("/grow-logs", methods=["GET"])
+@api_bp.route("/grow-logs", methods=["GET"])
 async def get_grow_logs():
     """Get all grow logs."""
     return jsonify(load_grow_logs())
 
 
-@app.route("/grow-logs", methods=["POST"])
+@api_bp.route("/grow-logs", methods=["POST"])
 async def create_grow():
     """Create a new grow."""
     data = await request.get_json()
@@ -487,7 +490,7 @@ async def create_grow():
     return error_response("Failed to save grow log", 500)
 
 
-@app.route("/grow-logs/<grow_id>", methods=["PUT"])
+@api_bp.route("/grow-logs/<grow_id>", methods=["PUT"])
 async def update_grow(grow_id):
     """Update an existing grow."""
     data = await request.get_json()
@@ -530,7 +533,7 @@ async def update_grow(grow_id):
     return error_response("Failed to save grow log", 500)
 
 
-@app.route("/grow-logs/<grow_id>", methods=["DELETE"])
+@api_bp.route("/grow-logs/<grow_id>", methods=["DELETE"])
 async def delete_grow(grow_id):
     """Delete a grow."""
     logs = load_grow_logs()
@@ -540,7 +543,7 @@ async def delete_grow(grow_id):
     return error_response("Failed to save grow log", 500)
 
 
-@app.route("/grow-logs/<grow_id>/entries", methods=["POST"])
+@api_bp.route("/grow-logs/<grow_id>/entries", methods=["POST"])
 async def add_grow_entry(grow_id):
     """Add an entry to a grow."""
     data = await request.get_json()
@@ -567,7 +570,7 @@ async def add_grow_entry(grow_id):
     return error_response("Failed to save entry", 500)
 
 
-@app.route("/grow-logs/<grow_id>/entries/<entry_id>", methods=["PUT"])
+@api_bp.route("/grow-logs/<grow_id>/entries/<entry_id>", methods=["PUT"])
 async def update_grow_entry(grow_id, entry_id):
     """Update an entry in a grow."""
     data = await request.get_json()
@@ -587,7 +590,7 @@ async def update_grow_entry(grow_id, entry_id):
     return error_response("Failed to save entry", 500)
 
 
-@app.route("/grow-logs/<grow_id>/entries/<entry_id>", methods=["DELETE"])
+@api_bp.route("/grow-logs/<grow_id>/entries/<entry_id>", methods=["DELETE"])
 async def delete_grow_entry(grow_id, entry_id):
     """Delete an entry from a grow."""
     logs = load_grow_logs()
@@ -600,7 +603,7 @@ async def delete_grow_entry(grow_id, entry_id):
     return error_response("Failed to delete entry", 500)
 
 
-@app.route("/grow-logs/export", methods=["GET"])
+@api_bp.route("/grow-logs/export", methods=["GET"])
 async def export_grow_logs():
     """Export grow logs as CSV or JSON download. Query: format=csv or format=json."""
     fmt = (request.args.get("format") or "csv").strip().lower()
@@ -650,7 +653,7 @@ async def export_grow_logs():
 
 
 # ✅ REST API to Update Settings (PIN required for protected keys)
-@app.route("/settings", methods=["POST"])
+@api_bp.route("/settings", methods=["POST"])
 async def update_settings():
     data = await request.get_json()
     if not isinstance(data, dict):
@@ -772,7 +775,7 @@ async def update_settings():
     return jsonify({"message": "Settings updated successfully!", "settings": current})
 
 # ✅ REST API for Manual Pump Activation (requires PIN session)
-@app.route("/activate-pump", methods=["POST"])
+@api_bp.route("/activate-pump", methods=["POST"])
 async def api_activate_pump():
     """Manually activate a pump (1 = pH Up, 2 = pH Down) for a specified duration."""
     err = require_pin_session()
@@ -809,7 +812,7 @@ async def api_activate_pump():
 
 
 # ✅ Restart the Backend Program (requires PIN session when PIN is configured)
-@app.route("/restart-program", methods=["POST"])
+@api_bp.route("/restart-program", methods=["POST"])
 async def restart_program():
     err = require_pin_session()
     if err is not None:
@@ -818,7 +821,7 @@ async def restart_program():
     return jsonify({"message": "Program restarted!"})
 
 # ✅ Restart the Raspberry Pi (requires PIN session when PIN is configured)
-@app.route("/restart-system", methods=["POST"])
+@api_bp.route("/restart-system", methods=["POST"])
 async def restart_system():
     err = require_pin_session()
     if err is not None:
@@ -827,7 +830,7 @@ async def restart_system():
     return jsonify({"message": "System restarting..."})
 
 # ✅ Shutdown the Raspberry Pi (requires PIN session when PIN is configured)
-@app.route("/shutdown", methods=["POST"])
+@api_bp.route("/shutdown", methods=["POST"])
 async def shutdown():
     err = require_pin_session()
     if err is not None:

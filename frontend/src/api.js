@@ -1,10 +1,16 @@
 import axios from "axios";
 import { API_PATHS, PIN_SESSION_HEADER } from "./constants";
 
+// Backend serves all routes under /api (so NPM can proxy /api and /api/ws to the backend).
+const API_PREFIX = "/api";
+
 // API and WebSocket base URLs: work both on LAN (IP:port) and behind NPM subdomain.
 function getApiConfig() {
   if (typeof window === "undefined") {
-    return { API_BASE_URL: "http://localhost:5000", WS_URL: "ws://localhost:5000/ws/settings" };
+    return {
+      API_BASE_URL: `http://localhost:5000${API_PREFIX}`,
+      WS_URL: `ws://localhost:5000${API_PREFIX}/ws/settings`,
+    };
   }
   const host = window.location.hostname;
   const protocol = window.location.protocol === "https:" ? "https:" : "http:";
@@ -23,14 +29,14 @@ function getApiConfig() {
   if (isSubdomainOrBackend) {
     const origin = `${protocol}//${host}${port ? ":" + port : ""}`;
     return {
-      API_BASE_URL: origin,
-      WS_URL: `${wsProtocol}//${host}${port ? ":" + port : ""}/ws/settings`,
+      API_BASE_URL: `${origin}${API_PREFIX}`,
+      WS_URL: `${wsProtocol}//${host}${port ? ":" + port : ""}${API_PREFIX}/ws/settings`,
     };
   }
   // LAN or local dev: frontend on another port, backend on 5000.
   return {
-    API_BASE_URL: `${protocol}//${host}:5000`,
-    WS_URL: `${wsProtocol}//${host}:5000/ws/settings`,
+    API_BASE_URL: `${protocol}//${host}:5000${API_PREFIX}`,
+    WS_URL: `${wsProtocol}//${host}:5000${API_PREFIX}/ws/settings`,
   };
 }
 
