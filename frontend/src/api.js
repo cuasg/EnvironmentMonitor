@@ -1,12 +1,40 @@
 import axios from "axios";
 import { API_PATHS, PIN_SESSION_HEADER } from "./constants";
 
-// Use same host and protocol as the page (works for Tailscale and HTTPS)
-const API_HOST = typeof window !== "undefined" ? window.location.hostname : "localhost";
-const protocol = typeof window !== "undefined" && window.location.protocol === "https:" ? "https:" : "http:";
-const wsProtocol = protocol === "https:" ? "wss:" : "ws:";
-const API_BASE_URL = `${protocol}//${API_HOST}:5000`;
-const WS_URL = `${wsProtocol}//${API_HOST}:5000/ws/settings`;
+// API and WebSocket base URLs: work both on LAN (IP:port) and behind NPM subdomain.
+function getApiConfig() {
+  if (typeof window === "undefined") {
+    return { API_BASE_URL: "http://localhost:5000", WS_URL: "ws://localhost:5000/ws/settings" };
+  }
+  const host = window.location.hostname;
+  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+  const wsProtocol = protocol === "https:" ? "wss:" : "ws:";
+  const port = window.location.port;
+
+  // Same-origin: subdomain (e.g. plantmonitor.alrusco.com) or when already on backend port.
+  const isSubdomainOrBackend =
+    port === "5000" ||
+    host !== "localhost" &&
+    host !== "127.0.0.1" &&
+    !/^10\./.test(host) &&
+    !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) &&
+    !/^192\.168\./.test(host);
+
+  if (isSubdomainOrBackend) {
+    const origin = `${protocol}//${host}${port ? ":" + port : ""}`;
+    return {
+      API_BASE_URL: origin,
+      WS_URL: `${wsProtocol}//${host}${port ? ":" + port : ""}/ws/settings`,
+    };
+  }
+  // LAN or local dev: frontend on another port, backend on 5000.
+  return {
+    API_BASE_URL: `${protocol}//${host}:5000`,
+    WS_URL: `${wsProtocol}//${host}:5000/ws/settings`,
+  };
+}
+
+const { API_BASE_URL, WS_URL } = getApiConfig();
 
 export { API_BASE_URL };
 
