@@ -17,23 +17,29 @@ function getApiConfig() {
   const wsProtocol = protocol === "https:" ? "wss:" : "ws:";
   const port = window.location.port;
 
-  // Same-origin: subdomain (e.g. plantmonitor.alrusco.com) or when already on backend port.
+  // Same-origin: subdomain, backend port, or Vite dev server (so proxy can forward to backend).
+  const isPrivateOrLocal =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    /^10\./.test(host) ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+    /^192\.168\./.test(host);
+  const isViteDevPort = port === "5173" || port === "5174";
   const isSubdomainOrBackend =
     port === "5000" ||
-    host !== "localhost" &&
-    host !== "127.0.0.1" &&
-    !/^10\./.test(host) &&
-    !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) &&
-    !/^192\.168\./.test(host);
+    (host !== "localhost" && host !== "127.0.0.1" &&
+     !/^10\./.test(host) &&
+     !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) &&
+     !/^192\.168\./.test(host));
 
-  if (isSubdomainOrBackend) {
+  if (isSubdomainOrBackend || (isPrivateOrLocal && isViteDevPort)) {
     const origin = `${protocol}//${host}${port ? ":" + port : ""}`;
     return {
       API_BASE_URL: `${origin}${API_PREFIX}`,
       WS_URL: `${wsProtocol}//${host}${port ? ":" + port : ""}${API_PREFIX}/ws/settings`,
     };
   }
-  // LAN or local dev: frontend on another port, backend on 5000.
+  // LAN with non-Vite port (e.g. production at :80): backend on same host:5000.
   return {
     API_BASE_URL: `${protocol}//${host}:5000${API_PREFIX}`,
     WS_URL: `${wsProtocol}//${host}:5000${API_PREFIX}/ws/settings`,
