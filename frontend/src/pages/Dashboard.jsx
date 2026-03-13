@@ -357,7 +357,21 @@ const Dashboard = () => {
     const air = formatNumber(data.air_temperature_f);
     const water = formatNumber(data.water_temperature_f);
     const lightVolt = formatNumber(data.light_sensor?.analog_voltage);
-    const signature = [phVal, ppm, hum, air, water, lightVolt, data.last_pump_activation?.timestamp, dev_mode, sensors_available].join("|");
+    const signature = [
+      phVal,
+      ppm,
+      hum,
+      air,
+      water,
+      lightVolt,
+      data.last_pump_activation?.timestamp,
+      data.last_ph_check,
+      data.last_ph_value,
+      data.previous_ph_check_value,
+      data.ph_trend_direction,
+      dev_mode,
+      sensors_available,
+    ].join("|");
     if (signature === lastSensorSignatureRef.current) return;
     lastSensorSignatureRef.current = signature;
 

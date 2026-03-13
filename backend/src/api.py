@@ -30,8 +30,9 @@ from pin_auth import (
 app = Quart(__name__)
 logger = logging.getLogger(__name__)
 
-# WebSocket broadcast interval (seconds) - 10s for Pi Zero efficiency
-WS_BROADCAST_INTERVAL = 10
+# WebSocket broadcast interval (seconds).
+# Slightly longer interval keeps the Pi W 2 happier while still feeling live.
+WS_BROADCAST_INTERVAL = 20
 
 PIN_SESSION_HEADER = "X-PIN-Session"
 
