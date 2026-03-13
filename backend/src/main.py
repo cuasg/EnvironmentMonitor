@@ -123,9 +123,9 @@ async def ph_monitoring():
         stabilization_time = pump_settings.get("stabilization_time", 30)
 
         # Mark the start of this pH check cycle so the UI can show the
-        # "checking" indicator and a meaningful start timestamp.
-        # - For the human-facing "last check start", we treat the previous
-        #   next_ph_check (scheduled time) as the start of this check.
+        # \"checking\" indicator and a meaningful start timestamp.
+        # - For the human-facing \"Last Check Start\", we record the actual
+        #   wall-clock time when this check begins in the display timezone.
         # - For the internal active-indicator timer, we still record a precise
         #   UTC \"started at\" so the frontend can detect an in-progress check.
         start_utc_iso = None
@@ -134,10 +134,14 @@ async def ph_monitoring():
         except Exception:
             start_utc_iso = None
         started_settings = load_settings()
-        # Use the prior next_ph_check as the \"last check start\" when available.
-        last_start = started_settings.get("next_ph_check")
-        if last_start:
-            started_settings["last_ph_check_start"] = last_start
+        # Record the actual local time when this check begins.
+        try:
+            tz = get_display_tz()
+            now_start = datetime.now(tz)
+            started_settings["last_ph_check_start"] = now_start.strftime("%Y-%m-%d %I:%M:%S %p")
+        except Exception:
+            # If anything goes wrong, leave the previous start intact.
+            pass
         started_settings["ph_check_started_at"] = start_utc_iso
         started_settings["ph_check_active"] = True
         await save_settings(started_settings)
