@@ -838,6 +838,44 @@ async def shutdown():
     os.system("sudo shutdown -h now")
     return jsonify({"message": "System shutting down..."})
 
+
+# ✅ Duplicate routes at root so NPM can proxy /api → backend with path stripped (/api/auth/setup → /auth/setup).
+@app.websocket("/ws/settings")
+async def root_settings_ws():
+    await settings_ws()
+
+
+def _register_root_routes():
+    app.add_url_rule("/settings", view_func=get_settings, methods=["GET"], endpoint="root_get_settings")
+    app.add_url_rule("/auth/status", view_func=auth_status, methods=["GET"], endpoint="root_auth_status")
+    app.add_url_rule("/auth/setup", view_func=auth_setup, methods=["POST"], endpoint="root_auth_setup")
+    app.add_url_rule("/auth/verify", view_func=auth_verify, methods=["POST"], endpoint="root_auth_verify")
+    app.add_url_rule("/auth/change-pin", view_func=auth_change_pin, methods=["POST"], endpoint="root_auth_change_pin")
+    app.add_url_rule("/trends", view_func=get_trends, methods=["GET"], endpoint="root_get_trends")
+    app.add_url_rule("/oled/config", view_func=get_oled_config, methods=["GET"], endpoint="root_get_oled_config")
+    app.add_url_rule("/oled/config", view_func=update_oled_config, methods=["POST"], endpoint="root_update_oled_config")
+    app.add_url_rule("/oled/display", view_func=get_oled_display, methods=["GET"], endpoint="root_get_oled_display")
+    app.add_url_rule("/influx/status", view_func=get_influx_status, methods=["GET"], endpoint="root_get_influx_status")
+    app.add_url_rule("/health", view_func=get_health, methods=["GET"], endpoint="root_get_health")
+    app.add_url_rule("/influx/config", view_func=get_influx_config, methods=["GET"], endpoint="root_get_influx_config")
+    app.add_url_rule("/influx/config", view_func=save_influx_config, methods=["POST"], endpoint="root_save_influx_config")
+    app.add_url_rule("/grow-logs", view_func=get_grow_logs, methods=["GET"], endpoint="root_get_grow_logs")
+    app.add_url_rule("/grow-logs", view_func=create_grow, methods=["POST"], endpoint="root_create_grow")
+    app.add_url_rule("/grow-logs/export", view_func=export_grow_logs, methods=["GET"], endpoint="root_export_grow_logs")
+    app.add_url_rule("/grow-logs/<grow_id>", view_func=update_grow, methods=["PUT"], endpoint="root_update_grow")
+    app.add_url_rule("/grow-logs/<grow_id>", view_func=delete_grow, methods=["DELETE"], endpoint="root_delete_grow")
+    app.add_url_rule("/grow-logs/<grow_id>/entries", view_func=add_grow_entry, methods=["POST"], endpoint="root_add_grow_entry")
+    app.add_url_rule("/grow-logs/<grow_id>/entries/<entry_id>", view_func=update_grow_entry, methods=["PUT"], endpoint="root_update_grow_entry")
+    app.add_url_rule("/grow-logs/<grow_id>/entries/<entry_id>", view_func=delete_grow_entry, methods=["DELETE"], endpoint="root_delete_grow_entry")
+    app.add_url_rule("/settings", view_func=update_settings, methods=["POST"], endpoint="root_update_settings")
+    app.add_url_rule("/activate-pump", view_func=api_activate_pump, methods=["POST"], endpoint="root_activate_pump")
+    app.add_url_rule("/restart-program", view_func=restart_program, methods=["POST"], endpoint="root_restart_program")
+    app.add_url_rule("/restart-system", view_func=restart_system, methods=["POST"], endpoint="root_restart_system")
+    app.add_url_rule("/shutdown", view_func=shutdown, methods=["POST"], endpoint="root_shutdown")
+
+
+_register_root_routes()
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.DEBUG if os.environ.get("PLANT_DEBUG") else logging.WARNING,

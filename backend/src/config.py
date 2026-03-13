@@ -75,10 +75,15 @@ API_HOST = _str("PLANT_API_HOST", "0.0.0.0")
 API_PORT = _int("PLANT_API_PORT", 5000)
 
 
-# --- CORS: allow frontend origins; Tailscale 100.x.x.x allowed by default ---
+# --- CORS: allow frontend origins; Tailscale 100.x.x.x and LAN IPs allowed ---
 # Tailscale CGNAT range 100.64.0.0/10 → second octet 64–127
 _TAILSCALE_ORIGIN_REGEX = re.compile(
     r"^https?://100\.(6[4-9]|[7-9]\d|1[0-2]\d)\.\d{1,3}\.\d{1,3}(:\d+)?$"
+)
+# LAN: 10.x, 192.168.x, 172.16–31.x (and localhost)
+_LAN_ORIGIN_REGEX = re.compile(
+    r"^https?://(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$",
+    re.IGNORECASE,
 )
 
 
@@ -97,16 +102,18 @@ _CORS_EXPLICIT = _cors_explicit_origins()
 
 
 def allow_origin(origin: str) -> bool:
-    """Return True if origin is allowed (explicit list or Tailscale IP range). Used by CORS middleware."""
+    """Return True if origin is allowed (explicit list, Tailscale, or LAN). Used by CORS middleware."""
     if not origin:
         return False
     if origin in _CORS_EXPLICIT:
         return True
     if _TAILSCALE_ORIGIN_REGEX.match(origin):
         return True
+    if _LAN_ORIGIN_REGEX.match(origin):
+        return True
     return False
 
 
-# List for quart_cors: explicit origins + Tailscale regex (quart_cors does not support a callable)
+# List for quart_cors: explicit origins + Tailscale + LAN regex (quart_cors does not support a callable)
 CORS_ORIGINS = _CORS_EXPLICIT
-CORS_ALLOW_ORIGIN_LIST = _CORS_EXPLICIT + [_TAILSCALE_ORIGIN_REGEX]
+CORS_ALLOW_ORIGIN_LIST = _CORS_EXPLICIT + [_TAILSCALE_ORIGIN_REGEX, _LAN_ORIGIN_REGEX]
