@@ -57,7 +57,6 @@ def require_pin_session():
 
 # CORS: list of origins + Tailscale regex (quart_cors expects list/Pattern, not callable)
 app = cors(app, allow_origin=CORS_ALLOW_ORIGIN_LIST)
-app.register_blueprint(api_bp)
 
 # ✅ WebSocket Clients List (Changed to a List Instead of a Set)
 connected_clients = []
@@ -838,6 +837,9 @@ async def shutdown():
     os.system("sudo shutdown -h now")
     return jsonify({"message": "System shutting down..."})
 
+
+# Register blueprint only after all api_bp routes are defined (Quart/Flask forbid adding routes after registration).
+app.register_blueprint(api_bp)
 
 # ✅ Duplicate routes at root so NPM can proxy /api → backend with path stripped (/api/auth/setup → /auth/setup).
 @app.websocket("/ws/settings")
