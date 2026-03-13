@@ -7,7 +7,7 @@ from settings import load_settings, save_settings, get_display_tz
 logger = logging.getLogger(__name__)
 from sensors import read_all_sensors, read_ph_sensor
 from pumps import activate_pump
-from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer, buffer_size, latest_age_seconds, get_last_n_values
+from ph_buffer import add_reading, get_average, get_last_n_average, clear_buffer, buffer_size, get_last_n_values
 from database import log_sensor_data
 from ph_check_log import log_ph_check
 
@@ -146,37 +146,26 @@ async def ph_monitoring():
         started_settings["ph_check_active"] = True
         await save_settings(started_settings)
 
-        # Prefer an average of the most recent 30 continuous-cycle readings
-        # so that scheduled checks are based on a stable value instead of
-        # a single potentially noisy sample. The minimum number of samples
-        # required can be tuned via sensor_intervals.ph_min_samples.
-        avg_ph_value = get_last_n_average(count=30, min_readings=ph_min_samples)
-
         # Track how many buffered samples we currently have versus the target
         try:
             total_samples_in_buffer = buffer_size()
         except Exception:
             total_samples_in_buffer = 0
 
-        # Decide whether data is stale or just insufficient, so we can log
-        # a more precise reason for skipped checks.
-        try:
-            age_seconds = latest_age_seconds()
-        except Exception:
-            age_seconds = None
-        # Consider data fresh for longer to avoid over-triggering stale_data.
-        # Allow up to 4x the sensor_update_interval, with a minimum of 30 minutes.
-        max_fresh_age = max(4 * sensor_update_interval, 30 * 60)
-        stale_data = age_seconds is None or age_seconds > max_fresh_age
+        # Decide whether we have enough samples to compute a stable average.
         insufficient_samples = total_samples_in_buffer < ph_min_samples
 
-        # Also ensure the buffer is "fresh" — if the latest sample is too old,
-        # we treat the average as unavailable so we never act on stale data.
-        if stale_data:
+        # Prefer an average of the most recent continuous-cycle readings so that
+        # scheduled checks are based on a stable value instead of a single
+        # potentially noisy sample. If we don't yet have enough samples, we
+        # skip any pump action for this cycle and try again on the next one.
+        if insufficient_samples:
             avg_ph_value = None
+        else:
+            avg_ph_value = get_last_n_average(count=ph_min_samples, min_readings=ph_min_samples)
 
-        # If we don't have enough *fresh* samples to compute a stable average,
-        # we skip any pump action for this cycle and treat it as "average or bust".
+        # If we still couldn't compute an average (e.g. buffer empty for some
+        # reason), treat it as insufficient and skip pump action.
         if avg_ph_value is None:
             existing_settings = load_settings()
             samples_required = ph_min_samples
@@ -201,19 +190,13 @@ async def ph_monitoring():
             # Log this attempted check for the health page (insufficient / stale data).
             try:
                 readings = get_last_n_values(count=30)
-                if stale_data:
-                    reason = "stale_data"
-                elif insufficient_samples:
-                    reason = "insufficient_samples"
-                else:
-                    reason = "unknown"
                 log_ph_check(
                     ts=now_end,
                     readings=readings,
                     avg_value=None,
                     samples_required=samples_required,
                     samples_available=samples_used,
-                    reason=reason,
+                    reason="insufficient_samples",
                 )
             except Exception:
                 pass
